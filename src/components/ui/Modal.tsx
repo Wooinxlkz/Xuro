@@ -1,0 +1,123 @@
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { EASE_OUT, SPRING_PANEL } from "@/lib/ease";
+import { cn } from "@/lib/utils";
+
+type Align = "center" | "top";
+
+/**
+ * Backdrop + spring-entered panel, sharing beui's motion tokens so our own
+ * dialogs and any component pulled from the beui registry feel identical.
+ * Handles Escape and click-outside. Pass a shared `layoutId` to both a trigger
+ * and this panel for a morph-open effect.
+ */
+export function Modal({
+  open,
+  onClose,
+  children,
+  align = "center",
+  className,
+  layoutId,
+  ariaLabel,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  align?: Align;
+  className?: string;
+  layoutId?: string;
+  ariaLabel?: string;
+}) {
+  const reduce = useReducedMotion();
+  const enterY = reduce ? 0 : align === "top" ? -10 : 10;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!open) return;
+    previousFocus.current = document.activeElement as HTMLElement | null;
+    const focusable = () =>
+      Array.from(
+        panelRef.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+    requestAnimationFrame(() => focusable()[0]?.focus());
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) {
+        event.preventDefault();
+        panelRef.current?.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      previousFocus.current?.focus();
+    };
+  }, [open]);
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transition: { duration: 0.1, ease: EASE_OUT } }}
+          transition={{ duration: 0.2, ease: EASE_OUT }}
+          className={cn(
+            "fixed inset-0 z-80 flex justify-center bg-background/5 backdrop-blur-sm",
+            align === "center" ? "items-center" : "items-start",
+          )}
+          onMouseDown={onClose}
+        >
+          <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={ariaLabel}
+            tabIndex={-1}
+            layoutId={layoutId}
+            initial={{ opacity: 0, y: enterY, scale: reduce ? 1 : 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{
+              opacity: 0,
+              y: enterY * 0.6,
+              scale: reduce ? 1 : 0.96,
+              transition: { duration: 0.14, ease: EASE_OUT },
+            }}
+            transition={SPRING_PANEL}
+            className={cn(
+              "relative max-w-[calc(100vw-48px)] z-50 overflow-hidden rounded-2xl border border-border/50 bg-background shadow-2xl shadow-black/20 will-change-transform dark:shadow-black/60",
+              className,
+            )}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            {children}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+}

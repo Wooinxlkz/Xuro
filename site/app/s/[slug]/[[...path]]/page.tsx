@@ -1,0 +1,110 @@
+import type { Metadata, Viewport } from "next";
+import { notFound } from "next/navigation";
+import { PublishedHeaderActions } from "@/components/published/PublishedHeaderActions";
+import { PublishedMarkdown } from "@/components/published/PublishedMarkdown";
+import { PublishedUsageBeacon } from "@/components/published/PublishedUsageBeacon";
+import {
+  getPublishedNote,
+  noteDescription,
+} from "@/lib/published-note";
+
+export const revalidate = 300;
+
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fbfbfa" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
+  ],
+};
+
+interface SharePageProps {
+  params: Promise<{ slug: string; path?: string[] }>;
+  searchParams: Promise<{ embed?: string | string[] }>;
+}
+
+function pagePath(path?: string[]) {
+  return path?.length ? path.join("/") : undefined;
+}
+
+export async function generateMetadata({ params }: SharePageProps): Promise<Metadata> {
+  const { slug, path } = await params;
+  const note = await getPublishedNote(slug, pagePath(path));
+  if (!note) {
+    return {
+      title: { absolute: "Published note · Xuro" },
+      robots: { index: false },
+    };
+  }
+
+  const description = noteDescription(note.markdown) || "A note published with Xuro.";
+  return {
+    title: { absolute: `${note.title} · Xuro` },
+    description,
+    robots: { index: false, follow: false },
+    openGraph: {
+      title: note.title,
+      description,
+      type: "article",
+      siteName: "Xuro",
+    },
+    twitter: { card: "summary", title: note.title, description },
+  };
+}
+
+export default async function SharePage({ params, searchParams }: SharePageProps) {
+  const { slug, path } = await params;
+  const embed = (await searchParams).embed === "1";
+  const currentPath = pagePath(path);
+  const note = await getPublishedNote(slug, currentPath);
+  if (!note) notFound();
+  const viewEndpoint = `${new URL(note.assetBaseUrl).origin}/v1/public/views`;
+
+  return (
+    <main className="published-page min-h-dvh bg-background text-foreground">
+      <PublishedUsageBeacon endpoint={viewEndpoint} slug={slug} path={currentPath ?? ""} />
+      {!embed && (
+        <header className="fixed top-0 z-20 w-full border-b border-border/20 bg-background/60 backdrop-blur-xl">
+          <div className="mx-auto flex h-11 w-full items-center gap-3 px-3">
+            <p className="min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground">
+              {note.title}
+            </p>
+            <PublishedHeaderActions title={note.title} />
+          </div>
+        </header>
+      )}
+
+      <article
+        className={`mx-auto w-full max-w-2xl px-5 ${embed ? "pb-12 pt-10" : "pb-24 pt-28 sm:px-0"}`}
+      >
+        <div className="mb-10 pb-7">
+          <h1 className="text-balance text-[30px] font-[680] leading-[1.15] tracking-[-0.018em] sm:text-[34px]">
+            {note.title}
+          </h1>
+        </div>
+
+        <PublishedMarkdown
+          markdown={note.markdown}
+          siteSlug={slug}
+          assetBaseUrl={note.assetBaseUrl}
+          assetTypes={note.assetTypes}
+          assetDimensions={note.assetDimensions}
+        />
+      </article>
+
+      {!embed && (
+        <footer className="mx-auto flex w-full max-w-3xl items-center justify-center px-5 py-4 text-[11.5px] text-faint sm:px-0">
+          <span>
+            Published with{" "}
+            <a
+              href="/"
+              className="rounded-sm text-foreground transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground"
+            >
+              Xuro
+            </a>
+          </span>
+        </footer>
+      )}
+    </main>
+  );
+}

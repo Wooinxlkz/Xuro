@@ -1,0 +1,68 @@
+Xuro Source-Available License 1.0
+
+Copyright (c) 2026 The Xuro Project ("NullTrace")
+
+This license applies to the Xuro source code and the compiled application
+distributed from the official Xuro GitHub repository
+(https://github.com/Wooinxlkz/Xuro) and https://usexuro.app.
+
+## 1. What you may do
+
+- Download and run the official compiled builds of Xuro, for free, for any
+  personal or internal purpose.
+- View, read, and study the source code in this repository.
+- Clone or fork this repository for the sole purposes of local evaluation,
+  learning, and preparing contributions (e.g. bug fixes or features) back
+  to the official project via a pull request.
+- Run a modified local build of the source code for your own personal use.
+
+## 2. What you may NOT do, without prior written permission from the
+   copyright holder
+
+- Redistribute the source code, in original or modified form, to any third
+  party or through any other channel (including but not limited to other
+  Git hosts, package registries, file-sharing sites, or your own website).
+- Publish, host, or distribute a compiled build of Xuro or any modified
+  derivative of it, under the Xuro name or any other name.
+- Sell, sublicense, or otherwise commercially exploit the source code, the
+  compiled application, or any derivative of either.
+- Use the "Xuro" name, wordmark, or logo (including the assets under
+  `src-tauri/icons/` and `public/logo.svg`) to identify any other product,
+  fork, or service, or in any way that implies endorsement by or
+  affiliation with the Xuro project.
+- Remove or alter this license, or any copyright notice, from the source
+  code.
+
+Forks intended purely as pull requests back to this repository are fine.
+A public fork that is never contributed back and instead serves as an
+independent distribution point falls outside what this license permits —
+if that's what you're after, ask first.
+
+## 3. No warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+## 4. Contact
+
+For permissions beyond what's granted above (commercial licensing,
+redistribution, etc.), open an issue on the repository or reach out via
+the contact details on https://usexuro.app.
+
+---
+
+Note: this is a plain-language license written for this project, not a
+lawyer-drafted one, and its enforceability can vary by jurisdiction. If
+strict legal enforcement ever matters to you, have a lawyer review it —
+this text is meant to clearly signal intent to users and contributors,
+not to substitute for that.
+
+## Reporting a vulnerability
+
+See [SECURITY.md](./SECURITY.md) for how to report a security issue
+privately. Please do not open a public issue for suspected vulnerabilities.

@@ -1,0 +1,198 @@
+export type Theme = "system" | "light" | "dark";
+
+export type AccentColor =
+  | "default"
+  | "blue"
+  | "green"
+  | "purple"
+  | "red"
+  | "orange"
+  | "custom";
+
+export type BackgroundStyle = "default" | "cream" | "soft";
+
+export type NodeKind = "folder" | "note" | "canvas";
+
+export interface TreeNode {
+  name: string;
+  /** Path relative to the vault root, e.g. "projects/app.md". */
+  rel: string;
+  kind: NodeKind;
+  children?: TreeNode[];
+  modifiedMs: number;
+}
+
+export interface VaultSnapshot {
+  root: string;
+  name: string;
+  tree: TreeNode[];
+  theme: Theme;
+  accentColor: AccentColor;
+  accentCustomHex: string | null;
+  backgroundStyle: BackgroundStyle;
+}
+
+export type TodoStatus = "todo" | "in_progress" | "done";
+
+export interface Todo {
+  id: string;
+  text: string;
+  done: boolean;
+  createdAt: number;
+  completedAt: number | null;
+  tags: string[];
+  inProgress: boolean;
+  boardId: string;
+}
+
+export interface Board {
+  id: string;
+  title: string;
+  createdAt: number;
+}
+
+export interface Bookmark {
+  id: string;
+  url: string;
+  title: string;
+  image: string | null;
+  favicon: string | null;
+  metaFetched: boolean;
+  tags: string[];
+  createdAt: number;
+}
+
+export interface SearchHit {
+  rel: string;
+  title: string;
+  snippet: string;
+  titleMatch: boolean;
+}
+
+export interface TaggedNote {
+  rel: string;
+  title: string;
+}
+
+export interface TagEntry {
+  tag: string;
+  notes: TaggedNote[];
+}
+
+export interface Snippet {
+  id: string;
+  title: string;
+  language: string;
+  content: string;
+  createdAt: number;
+}
+
+export interface Template {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+}
+
+export interface ObsidianImportSummary {
+  folder: string;
+  notesImported: number;
+  attachmentsImported: number;
+  skipped: string[];
+}
+
+export interface GraphNode {
+  rel: string;
+  title: string;
+  degree: number;
+  /** Rel of the immediate parent folder, or null at the vault root. */
+  folder: string | null;
+  kind: "note" | "canvas";
+  createdMs: number;
+  modifiedMs: number;
+  sizeBytes: number;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+}
+
+/** A folder rendered as a compound container node in the graph. */
+export interface GraphFolder {
+  rel: string;
+  name: string;
+  parent: string | null;
+  /** Every note anywhere under this folder, direct or nested. */
+  noteCount: number;
+  modifiedMs: number;
+  /** Deterministic 0-359 hue derived from the folder's path. */
+  hue: number;
+}
+
+export interface Graph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  folders: GraphFolder[];
+}
+
+export interface BacklinkMention {
+  sourceRel: string;
+  context: string;
+  line: number;
+  occurrence: number;
+}
+
+export interface PublishedShare {
+  id: string;
+  entryId: string;
+  slug: string;
+  url: string;
+  title: string;
+  contentHash: string;
+  publishedAt: number;
+  updatedAt: number;
+  pageCount: number;
+  assetCount: number;
+}
+
+export interface PublishPageDraft {
+  rel: string;
+  path: string;
+  title: string;
+  markdown: string;
+}
+
+export interface CloudAccount {
+  email: string;
+  plan: "free" | "cloud";
+}
+
+export interface CloudAccountStatus {
+  account: CloudAccount | null;
+}
+
+export interface OtpChallenge {
+  challengeId: string;
+  email: string;
+  expiresIn: number;
+  resendAfter: number;
+}
+
+export interface PublishedNoteStatus {
+  account: CloudAccount | null;
+  share: PublishedShare | null;
+  isOutdated: boolean;
+}
+
+export type View =
+  | { type: "note"; rel: string }
+  | { type: "canvas"; rel: string }
+  | { type: "todos" }
+  | { type: "bookmarks" }
+  | { type: "daily" }
+  | { type: "tags" }
+  | { type: "kanban" }
+  | { type: "snippets" }
+  | { type: "templates" }
+  | { type: "graph" };

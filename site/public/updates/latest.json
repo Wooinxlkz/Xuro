@@ -1,0 +1,11 @@
+{
+  "version": "0.1.7",
+  "notes": "## Xuro Release v0.1.7\n\nDownload the version for your operating system below.",
+  "pub_date": "2026-08-27T09:47:29.511Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRM0liMlRZY0cxZGVpbjVZd3VVT3NTdnNxNlRqa0xYRHJoMk85V0tWKzJiWkMyR2lNUmFNc3RseTc0eTlKSUU4eGJMTWR5ZiszUitMNjBmTysxaUs5aXcyZFhzWnh2L3dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3ODI0MDQ3CWZpbGU6WHVyb18wLjEuN194NjQtc2V0dXAuZXhlCjdncXlwRGpuK05zWFBKd3BXc2Z2UGh6Y25VM0tuZ01xV1c5VHA4NEJTZ0JvaWVXa3JXNjNlaUNlVzVyN2p4eWIrdjhNYVVmaW1qeHNVSDlvcVpMUkNBPT0K",
+      "url": "https://github.com/Wooinxlkz/Xuro/releases/download/v0.1.7/Xuro_0.1.7_x64-setup.exe"
+    }
+  }
+}
