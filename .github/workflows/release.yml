@@ -221,12 +221,14 @@ jobs:
 
       - name: Publish to GitHub release
         run: |
-          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --generate-notes \
               --title "Xuro ${VERSION}"
 
           gh release upload "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
             merged-artifacts/* \
             --clobber
