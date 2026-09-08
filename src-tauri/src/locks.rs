@@ -1,16 +1,16 @@
-//! PIN locks on notes and folders — an in-app access gate, not file
-//! encryption. A locked note/folder's content is hidden from the UI until
-//! the correct PIN is entered; the underlying file on disk is untouched and
-//! readable by anything with filesystem access (a text editor, another app).
-//! That's a deliberate, disclosed limitation, not an oversight — see
-//! `README.md`'s "Data & privacy" section.
+//! PIN locks on notes and folders. The PIN itself is an in-app access
+//! gate — it decides whether the app shows a note's content in the UI —
+//! and is never stored in plain text: each lock keeps a random salt and
+//! `sha256(salt + pin)`, so reading `locks.json` directly doesn't hand
+//! over the PIN.
 //!
-//! PINs are never stored in plain text: each lock keeps a random salt and
-//! `sha256(salt + pin)`, so reading `locks.json` directly doesn't hand over
-//! the PIN. This is a deterrent against casual/offline viewing, not
-//! cryptographic-grade protection — a 4-digit PIN is only ever brute-force
-//! resistant to another *app* rate-limiting attempts, not to someone with
-//! the hash and unlimited local guesses.
+//! What backs that gate has changed, though: locking a note or folder now
+//! actually encrypts its `.md` file content on disk with AES-256-GCM
+//! (`vault_crypto.rs`), using a per-vault key held in the OS keychain —
+//! not just a UI-level hide. Unlocking decrypts it back to plain text.
+//! See `vault_crypto.rs` for why the PIN and the encryption key are kept
+//! as two separate things (short answer: so forgetting a 4-digit PIN can
+//! never mean permanently losing the note).
 
 use std::collections::HashMap;
 use std::fs;
@@ -22,7 +22,8 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
-use crate::vault::{resolve_rel, DATA_DIR};
+use crate::vault::{is_reserved_note_path, resolve_rel, DATA_DIR};
+use crate::vault_crypto;
 
 fn store_path(root: &Path) -> PathBuf {
     root.join(DATA_DIR).join("locks.json")
@@ -104,16 +105,77 @@ pub fn is_protected(root: &Path, rel: &str) -> bool {
     false
 }
 
+/// Every `.md` file `set_pin`/`remove_lock` needs to (de/en)crypt for a
+/// given locked rel: just that file if `rel` is a note, or every note
+/// nested anywhere under it if `rel` is a folder. Mirrors the same
+/// skip-dotfiles/skip-reserved-paths filtering `backlinks::walk_notes`
+/// uses for the rest of the app's full-vault scans.
+fn note_files_under(root: &Path, rel: &str) -> AppResult<Vec<PathBuf>> {
+    let path = resolve_rel(root, rel)?;
+    if path.is_file() {
+        return Ok(if path.extension().is_some_and(|e| e == "md") {
+            vec![path]
+        } else {
+            Vec::new()
+        });
+    }
+    let mut out = Vec::new();
+    collect_note_files(root, &path, &mut out);
+    Ok(out)
+}
+
+fn collect_note_files(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with('.') || is_reserved_note_path(root, &path) {
+            continue;
+        }
+        if path.is_dir() {
+            collect_note_files(root, &path, out);
+        } else if path.extension().is_some_and(|e| e == "md") {
+            out.push(path);
+        }
+    }
+}
+
 /// Set or replace the PIN on a note/folder. The caller (a Tauri command) is
 /// responsible for requiring the *old* PIN first when one already exists —
 /// this function itself does not re-verify, so it doubles as the "forgot my
 /// PIN" reset path from Settings.
+///
+/// The PIN and the file encryption are independent: changing the PIN on an
+/// already-locked entry only updates the salt/hash used to gate the UI —
+/// the file content stays encrypted under the same vault-wide key the whole
+/// time, so a PIN reset never needs to touch (or risk corrupting) any note.
+/// Only the very first time something is locked does its content actually
+/// transition from plain text to ciphertext.
 pub fn set_pin(root: &Path, rel: &str, pin: &str) -> AppResult<()> {
     if !is_entry(root, rel) {
         return Err(AppError::NotFound(rel.to_string()));
     }
     validate_pin(pin)?;
     let mut map = read(root)?;
+    let already_locked = map.contains_key(rel);
+
+    if !already_locked {
+        let key = vault_crypto::vault_key(root)?;
+        for path in note_files_under(root, rel)? {
+            let content = fs::read_to_string(&path)?;
+            // Idempotent: if this file is somehow already ciphertext (e.g.
+            // a note inside a folder that's re-locked after a partial prior
+            // failure), don't encrypt it a second time.
+            if vault_crypto::is_encrypted(&content) {
+                continue;
+            }
+            let encrypted = vault_crypto::encrypt_with_key(&key, &content)?;
+            fs::write(&path, encrypted)?;
+        }
+    }
+
     let salt = Uuid::new_v4().to_string();
     let hash = hash_pin(&salt, pin);
     map.insert(rel.to_string(), LockEntry { salt, hash });
@@ -130,9 +192,22 @@ pub fn verify_pin(root: &Path, rel: &str, pin: &str) -> AppResult<bool> {
 }
 
 /// Remove a lock outright — used for the explicit "Remove PIN" menu action
-/// and as the second half of the Settings "forgot my PIN" reset.
+/// and as the second half of the Settings "forgot my PIN" reset. Decrypts
+/// every note under `rel` back to plain text, restoring it to an ordinary,
+/// fully portable `.md` file.
 pub fn remove_lock(root: &Path, rel: &str) -> AppResult<()> {
     let mut map = read(root)?;
+    if map.contains_key(rel) {
+        let key = vault_crypto::vault_key(root)?;
+        for path in note_files_under(root, rel)? {
+            let content = fs::read_to_string(&path)?;
+            if !vault_crypto::is_encrypted(&content) {
+                continue;
+            }
+            let plaintext = vault_crypto::decrypt_with_key(&key, &content)?;
+            fs::write(&path, plaintext)?;
+        }
+    }
     map.remove(rel);
     save(root, &map)
 }
@@ -233,6 +308,78 @@ mod tests {
         set_pin(dir.path(), "Secret.md", "1234").unwrap();
         remove_lock(dir.path(), "Secret.md").unwrap();
         assert!(!is_locked(dir.path(), "Secret.md"));
+    }
+
+    #[test]
+    fn locking_a_note_actually_encrypts_its_file_on_disk() {
+        let dir = setup();
+        let path = notes_root(dir.path()).join("Secret.md");
+        fs::write(&path, "the launch codes are 1234").unwrap();
+
+        set_pin(dir.path(), "Secret.md", "1234").unwrap();
+
+        let on_disk = fs::read_to_string(&path).unwrap();
+        assert!(
+            !on_disk.contains("launch codes"),
+            "locked note content must not be readable as plain text on disk"
+        );
+        assert!(vault_crypto::is_encrypted(&on_disk));
+    }
+
+    #[test]
+    fn unlocking_a_note_decrypts_it_back_to_plain_text() {
+        let dir = setup();
+        let path = notes_root(dir.path()).join("Secret.md");
+        fs::write(&path, "back to normal").unwrap();
+
+        set_pin(dir.path(), "Secret.md", "1234").unwrap();
+        remove_lock(dir.path(), "Secret.md").unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), "back to normal");
+    }
+
+    #[test]
+    fn locking_a_folder_encrypts_every_note_nested_inside_it() {
+        let dir = setup();
+        fs::create_dir_all(notes_root(dir.path()).join("projects/deep")).unwrap();
+        fs::write(notes_root(dir.path()).join("projects/Plan.md"), "plan A").unwrap();
+        fs::write(
+            notes_root(dir.path()).join("projects/deep/Nested.md"),
+            "plan B",
+        )
+        .unwrap();
+
+        set_pin(dir.path(), "projects", "4321").unwrap();
+
+        let plan = fs::read_to_string(notes_root(dir.path()).join("projects/Plan.md")).unwrap();
+        let nested =
+            fs::read_to_string(notes_root(dir.path()).join("projects/deep/Nested.md")).unwrap();
+        assert!(vault_crypto::is_encrypted(&plan));
+        assert!(vault_crypto::is_encrypted(&nested));
+    }
+
+    #[test]
+    fn changing_the_pin_on_an_already_locked_note_does_not_re_encrypt_it() {
+        let dir = setup();
+        let path = notes_root(dir.path()).join("Secret.md");
+        fs::write(&path, "stays encrypted once, not twice").unwrap();
+
+        set_pin(dir.path(), "Secret.md", "1234").unwrap();
+        let after_first_lock = fs::read_to_string(&path).unwrap();
+
+        // Changing the PIN (the "forgot my PIN" reset path) must only touch
+        // the salt/hash — re-running the encryption step would wrap already
+        // -encrypted bytes in a second layer of ciphertext, which
+        // `remove_lock` (a single decrypt pass) could never fully undo.
+        set_pin(dir.path(), "Secret.md", "5678").unwrap();
+        let after_pin_change = fs::read_to_string(&path).unwrap();
+        assert_eq!(after_first_lock, after_pin_change);
+
+        remove_lock(dir.path(), "Secret.md").unwrap();
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "stays encrypted once, not twice"
+        );
     }
 
     #[test]

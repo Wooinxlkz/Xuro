@@ -21,6 +21,7 @@ use crate::backlink_links::{normalize_destination, resolve_wiki, scan_content};
 use crate::backlinks::{collect_note_rels, walk_notes};
 use crate::error::AppResult;
 use crate::vault::{notes_root, rel_of};
+use crate::vault_crypto;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -119,6 +120,11 @@ pub fn build_graph(root: &Path) -> AppResult<Graph> {
     let mut edge_set: HashSet<(String, String)> = HashSet::new();
 
     walk_notes(root, &notes_root(root), &mut |path, content| {
+        // Same transparent decrypt as `backlinks::find_backlinks` — a
+        // locked note's own links still count toward the graph, exactly
+        // as they did before encryption existed.
+        let content = vault_crypto::read_transparent(root, content.to_string())?;
+        let content = content.as_str();
         let source_rel = rel_of(root, path)?;
         scan_content(content, |_line, _line_number, raw, wiki| {
             let target = if wiki {

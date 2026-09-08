@@ -1,4 +1,4 @@
-import { hmacSha256, newId, randomOtp, randomToken, sha256 } from "./crypto";
+import { hmacSha256, newId, randomOtp, randomToken, sha256, timingSafeEqual } from "./crypto";
 import { queueWelcomeEmail, sendOtpEmail } from "./email";
 import { json, readJson } from "./http";
 import type { AccountPlan, Env } from "./types";
@@ -220,7 +220,7 @@ export async function verifyOtp(
   }
 
   const candidateHash = await otpHash(env, challengeId, code);
-  if (candidateHash !== challenge.code_hash) {
+  if (!timingSafeEqual(candidateHash, challenge.code_hash)) {
     await env.DB.prepare(
       "UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = ? AND consumed_at IS NULL",
     )

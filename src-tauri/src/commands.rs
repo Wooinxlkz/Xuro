@@ -10,6 +10,7 @@ use crate::bookmarks::{self, Bookmark};
 use crate::boards::{self, Board};
 use crate::config::{self, AccentColor, BackgroundStyle, Theme};
 use crate::error::{AppError, AppResult};
+use crate::library::{self, LibraryItem, LibrarySearchResult};
 use crate::search::SearchHit;
 use crate::todos::{self, Todo};
 use crate::vault::{self, TreeNode};
@@ -650,6 +651,81 @@ pub fn board_rename(state: State<'_, AppState>, id: String, title: String) -> Ap
 #[tauri::command]
 pub fn board_delete(state: State<'_, AppState>, id: String) -> AppResult<Vec<Board>> {
     boards::delete(&state.root()?, &id)
+}
+
+// ---- library (books/manga) ----
+
+#[tauri::command]
+pub fn library_list(state: State<'_, AppState>) -> AppResult<Vec<LibraryItem>> {
+    library::list(&state.root()?)
+}
+
+#[tauri::command]
+pub async fn library_search_books(query: String) -> AppResult<Vec<LibrarySearchResult>> {
+    library::search_books(&query).await
+}
+
+#[tauri::command]
+pub async fn library_search_manga(query: String) -> AppResult<Vec<LibrarySearchResult>> {
+    library::search_manga(&query).await
+}
+
+#[tauri::command]
+pub fn library_add_from_search(
+    state: State<'_, AppState>,
+    result: LibrarySearchResult,
+) -> AppResult<LibraryItem> {
+    library::add_from_search(&state.root()?, result)
+}
+
+#[tauri::command]
+pub fn library_upload(
+    state: State<'_, AppState>,
+    source_path: String,
+    title: String,
+    author: Option<String>,
+    kind: library::LibraryKind,
+) -> AppResult<LibraryItem> {
+    library::upload(&state.root()?, &source_path, &title, author, kind)
+}
+
+#[tauri::command]
+pub fn library_remove(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    library::remove(&state.root()?, &id)
+}
+
+#[tauri::command]
+pub fn library_set_last_page(
+    state: State<'_, AppState>,
+    id: String,
+    page: u32,
+) -> AppResult<LibraryItem> {
+    library::set_last_page(&state.root()?, &id, page)
+}
+
+/// Open a native file picker for a book/manga file to upload. Returns the
+/// picked path as a string for the frontend to pass straight to
+/// `library_upload`; async for the same reason as `choose_vault` — the
+/// blocking dialog call must not run on the main thread.
+#[tauri::command]
+pub async fn library_pick_upload_file(app: AppHandle) -> AppResult<Option<String>> {
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_title("Choose a book or manga file")
+            .add_filter("Documents", &["pdf", "epub", "cbz", "cbr"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?;
+
+    let Some(picked) = picked else {
+        return Ok(None);
+    };
+    let path = picked
+        .into_path()
+        .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+    Ok(Some(path.to_string_lossy().to_string()))
 }
 
 // ---- bookmarks ----

@@ -11,6 +11,7 @@ import {
   Hash,
   Kanban,
   LayoutTemplate,
+  Library,
   Moon,
   Search,
   Settings,
@@ -129,6 +130,12 @@ export function Sidebar() {
           icon={<Waypoints size={15} strokeWidth={1.75} />}
           label="Graph"
           onClick={() => setView({ type: "graph" })}
+        />
+        <PageLink
+          active={view?.type === "library"}
+          icon={<Library size={15} strokeWidth={1.75} />}
+          label="Library"
+          onClick={() => setView({ type: "library" })}
         />
       </nav>
 

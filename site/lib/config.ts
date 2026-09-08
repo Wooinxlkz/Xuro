@@ -1,6 +1,6 @@
 // Release coordinates, kept in sync with scripts/release.sh output.
-export const VERSION = "0.1.0";
-export const GITHUB_REPO = "Wooinxlkz/xuro";
+export const VERSION = "0.1.1";
+export const GITHUB_REPO = "Wooinxlkz/Xuro";
 export const GITHUB = `https://github.com/${GITHUB_REPO}`;
 export const DMG = `${GITHUB}/releases/download/v${VERSION}/Xuro_${VERSION}_aarch64.dmg`;
 export const LINUX_APPIMAGE = `${GITHUB}/releases/download/v${VERSION}/Xuro_${VERSION}_amd64.AppImage`;

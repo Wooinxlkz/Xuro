@@ -1,5 +1,23 @@
 const encoder = new TextEncoder();
 
+/**
+ * Constant-time comparison for two equal-length hex digests (OTP hashes,
+ * session token hashes, etc.). A plain `===`/`!==` on these short-circuits
+ * at the first differing byte, which — with no other mitigation — leaks a
+ * tiny timing signal per guess. `MAX_ATTEMPTS` + per-IP/per-email rate
+ * limiting already make that impractical to exploit over a network, but
+ * comparing secrets in constant time costs nothing and removes the signal
+ * entirely rather than relying solely on the rate limiter.
+ */
+export function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 export async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
   return Array.from(new Uint8Array(digest), (byte) =>

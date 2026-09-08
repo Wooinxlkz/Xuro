@@ -195,4 +195,29 @@ export type View =
   | { type: "kanban" }
   | { type: "snippets" }
   | { type: "templates" }
-  | { type: "graph" };
+  | { type: "graph" }
+  | { type: "library" };
+
+export type LibraryKind = "book" | "manga";
+
+export interface LibraryItem {
+  id: string;
+  title: string;
+  author: string | null;
+  kind: LibraryKind;
+  /** Remote cover image URL for a searched/added item. */
+  coverUrl: string | null;
+  /** Vault-relative path for an uploaded file, e.g. "Library/Dune.pdf". */
+  fileRel: string | null;
+  addedAt: number;
+  lastPage: number | null;
+}
+
+export interface LibrarySearchResult {
+  externalId: string;
+  title: string;
+  author: string | null;
+  kind: LibraryKind;
+  coverUrl: string | null;
+  year: number | null;
+}

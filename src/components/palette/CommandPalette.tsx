@@ -9,6 +9,7 @@ import {
   Hash,
   Kanban as KanbanIcon,
   LayoutTemplate,
+  Library,
   Minimize2,
   Search,
   Settings,
@@ -193,6 +194,12 @@ export function CommandPalette() {
         label: "Open Graph",
         icon: Waypoints,
         run: () => vault.setView({ type: "graph" }),
+      },
+      {
+        id: "library",
+        label: "Open Library",
+        icon: Library,
+        run: () => vault.setView({ type: "library" }),
       },
       {
         id: "zen-mode",

@@ -45,6 +45,7 @@ On top of that, it's fast. Every action — opening a note, searching, switching
 - **Export to PDF** — exports the note exactly as shown in the editor, math and tables and images included.
 - **Import from Obsidian** — bring an existing Obsidian vault's notes and images in, with `[[wikilinks]]` and embeds converted automatically. Never overwrites an existing import.
 - **Graph view** — a visual map of how your notes connect through links, grouped by folder like a workflow diagram: each folder gets a slight color tint, can be collapsed or expanded with a click, and right-clicking a note or folder shows its path, dates, size, and note count.
+- **Library** — a personal books/manga shelf with list, grid, and bento views. Search and add from free public catalogs (Open Library for books, Jikan for manga, both filtered for explicit content), or upload your own PDF/EPUB/CBZ/CBR file — uploads are copied into a `Library/` folder inside your vault, so they're backed up and synced with everything else. Uploaded files currently open in your system's default viewer; a fully in-app reader is planned.
 - **Zen mode** — hide all chrome for distraction-free writing.
 - **Canvas** — draw and diagram with a built-in Excalidraw canvas, saved as a real `.excalidraw` file in your vault.
 - **Publish with Xuro Cloud** *(optional, paid)* — publish a note together with its linked pages and images as one connected, readable site at your own shareable link. Nothing is uploaded unless you explicitly publish it.
@@ -105,7 +106,7 @@ See [AGENTS.md](./AGENTS.md) for the architecture guide, [CONTRIBUTING.md](./CON
 - Notes are stored locally as files you own, in a folder you chose.
 - No analytics, tracking, or note-content uploads — nothing leaves your machine unless you explicitly use Xuro Cloud publishing.
 - Saving a bookmark fetches that page's title, preview image, and favicon from the source URL.
-- PIN locks are an in-app access gate, not file encryption — locked content is hidden throughout Xuro's UI (including search), but the underlying file is still a normal file on disk, readable by anything with filesystem access, like any other text editor. Locking is protection from someone using Xuro on your machine, not from someone with direct access to your files.
+- PIN locks are a real encryption boundary, not just a UI hide: locking a note or folder encrypts its file content on disk with AES-256-GCM, using a per-vault key held in your OS keychain (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) — never written to disk in plain text. The PIN itself stays a separate, in-app access gate (a salted hash, never the encryption key), so a forgotten PIN can be reset from Settings without losing the note. Locked content is still hidden throughout Xuro's UI, including search, on top of now actually being unreadable at the file level too.
 - Publishing a note with Xuro Cloud uploads only that note (and anything it links to that you also choose to publish) to a shareable page; unpublishing removes it. Locked notes can't be published while locked.
 - The app checks GitHub Releases for available updates — no separate update server to trust. See [SECURITY.md](./SECURITY.md) for how to report a vulnerability.
 - Your notes are already just files — export is just copying a folder.

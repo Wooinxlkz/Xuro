@@ -11,6 +11,7 @@ use crate::error::AppResult;
 use crate::vault::{
     is_reserved_note_path, notes_root, rel_of, scan_tree, NodeKind, TreeNode,
 };
+use crate::vault_crypto;
 
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,6 +29,13 @@ pub fn find_backlinks(root: &Path, target_rel: &str) -> AppResult<Vec<BacklinkMe
     let note_rels = collect_note_rels(root)?;
     let mut mentions = Vec::new();
     walk_notes(root, &notes_root(root), &mut |path, content| {
+        // Locked notes are stored as ciphertext on disk (`vault_crypto.rs`)
+        // — decrypt transparently so a locked note's own outgoing links
+        // still show up in its backlinks/graph exactly as they did before
+        // encryption existed. Falls through unchanged for every ordinary,
+        // unlocked note.
+        let content = vault_crypto::read_transparent(root, content.to_string())?;
+        let content = content.as_str();
         let source_rel = rel_of(root, path)?;
         let mut occurrence = 0;
         scan_content(content, |line, line_number, raw, wiki| {

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::error::{AppError, AppResult};
 use crate::util::sanitize_name;
 use crate::vault::{notes_root, rel_of, resolve_rel};
+use crate::vault_crypto;
 use crate::{backlinks, cloud_metadata, locks, pins};
 
 const WELCOME: &str = r#"# Welcome to Xuro
@@ -46,7 +47,11 @@ pub fn read_note(root: &Path, rel: &str) -> AppResult<String> {
     if !path.is_file() {
         return Err(AppError::NotFound(rel.to_string()));
     }
-    Ok(fs::read_to_string(path)?)
+    // Transparent either way: a locked note's bytes on disk are AES-256-GCM
+    // ciphertext (`vault_crypto.rs`) — decrypt them here so every other
+    // caller (the editor, exports, etc.) keeps working with plain text and
+    // never has to know or care whether the note happens to be locked.
+    vault_crypto::read_transparent(root, fs::read_to_string(path)?)
 }
 
 pub fn write_note(root: &Path, rel: &str, content: &str) -> AppResult<()> {
@@ -54,7 +59,17 @@ pub fn write_note(root: &Path, rel: &str, content: &str) -> AppResult<()> {
     if !path.is_file() {
         return Err(AppError::NotFound(rel.to_string()));
     }
-    fs::write(path, content)?;
+    // `is_protected`, not `is_locked` — a note nested inside a locked
+    // *folder* isn't itself a key in locks.json, but its file on disk is
+    // still ciphertext (locking a folder encrypts everything under it),
+    // so saving it must re-encrypt too, or the next `read_note` would try
+    // to decrypt what's now plain text and fail.
+    let to_write = if locks::is_protected(root, rel) {
+        vault_crypto::encrypt(root, content)?
+    } else {
+        content.to_string()
+    };
+    fs::write(path, to_write)?;
     Ok(())
 }
 
@@ -277,5 +292,29 @@ mod tests {
     fn write_missing_note_errors() {
         let dir = setup();
         assert!(write_note(dir.path(), "nope.md", "x").is_err());
+    }
+
+    #[test]
+    fn reading_and_writing_a_locked_note_stays_transparent_but_the_file_is_encrypted() {
+        let dir = setup();
+        let rel = create_note_with_content(dir.path(), "", "Diary", "day one").unwrap();
+        crate::locks::set_pin(dir.path(), &rel, "1234").unwrap();
+
+        // The raw bytes on disk are ciphertext now...
+        let raw = fs::read_to_string(resolve_rel(dir.path(), &rel).unwrap()).unwrap();
+        assert!(crate::vault_crypto::is_encrypted(&raw));
+        assert!(!raw.contains("day one"));
+
+        // ...but read_note/write_note stay exactly as simple as before for
+        // every legitimate caller (the editor never has to know or care).
+        assert_eq!(read_note(dir.path(), &rel).unwrap(), "day one");
+        write_note(dir.path(), &rel, "day two").unwrap();
+        assert_eq!(read_note(dir.path(), &rel).unwrap(), "day two");
+
+        // And the on-disk bytes are still real ciphertext after that save —
+        // write_note re-encrypts on every save, it doesn't just encrypt once.
+        let raw_after = fs::read_to_string(resolve_rel(dir.path(), &rel).unwrap()).unwrap();
+        assert!(crate::vault_crypto::is_encrypted(&raw_after));
+        assert!(!raw_after.contains("day two"));
     }
 }

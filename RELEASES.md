@@ -2,13 +2,30 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
-Xuro's version numbering restarts at **v0.1.0** with this release. Everything built before this point — previously spread across versions 0.1.0 through 0.2.5 — is folded into this single entry below as a full retrospective, alongside what's new in this reset itself.
+## [0.1.1] — September 8, 2026
+
+Real vault encryption, and a Library
+
+### Security
+
+- PIN locks are now a real encryption boundary, not just a UI hide: locking a note or folder encrypts its file content on disk with AES-256-GCM. The key is a random 256-bit value generated once per vault and held in your OS keychain (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) — never written to disk in plain text, and never derived from the PIN itself, so resetting a forgotten PIN from Settings can never turn into permanently lost data. Unlocking decrypts a note back to an ordinary, fully portable `.md` file.
+- Fixed 9 dependency vulnerabilities (2 high, 7 moderate) flagged by `npm audit`, all transitive through the Graph canvas's Mermaid-diagram support.
+- Hardened the Xuro Cloud OTP verification to compare codes in constant time, removing a (largely theoretical, given the existing rate limiting) timing side-channel.
+- Removed unused, half-wired signed-update-manifest tooling that nothing in the app actually consumed, to avoid implying a stronger update-verification guarantee than the app makes today.
+
+### Features
+
+- Added **Library** — a personal books/manga shelf with list, grid, and bento views. Search and add from free public catalogs (Open Library for books, Jikan for manga), both filtered against explicit content. Upload your own PDF, EPUB, CBZ, or CBR — it's copied into a `Library/` folder inside your vault, so it's backed up and synced with everything else; opens in your system's default viewer for now.
+
+### Changed
+
+- Normalized the GitHub repo reference casing (`Wooinxlkz/Xuro`) across the update checker, website, and release scripts.
 
 ## [0.1.0] — September 7, 2026
 
 Xuro, from the ground up
 
-A fresh baseline: every feature and fix built so far, consolidated into one release, plus a smarter Graph view and multiple Kanban boards.
+Xuro's version numbering restarted here — a fresh baseline folding in everything built up to this point (previously spread across versions 0.1.0 through 0.2.5), consolidated into one release, plus a smarter Graph view and multiple Kanban boards.
 
 ### Features
 

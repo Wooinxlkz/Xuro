@@ -13,6 +13,9 @@ import type {
   OtpChallenge,
   ObsidianImportSummary,
   Graph,
+  LibraryItem,
+  LibraryKind,
+  LibrarySearchResult,
   SearchHit,
   Snippet,
   TagEntry,
@@ -162,6 +165,25 @@ export const ipc = {
   boardRename: (id: string, title: string) =>
     call<Board>("board_rename", { id, title }),
   boardDelete: (id: string) => call<Board[]>("board_delete", { id }),
+
+  libraryList: () => call<LibraryItem[]>("library_list"),
+  librarySearchBooks: (query: string) =>
+    call<LibrarySearchResult[]>("library_search_books", { query }),
+  librarySearchManga: (query: string) =>
+    call<LibrarySearchResult[]>("library_search_manga", { query }),
+  libraryAddFromSearch: (result: LibrarySearchResult) =>
+    call<LibraryItem>("library_add_from_search", { result }),
+  libraryUpload: (
+    sourcePath: string,
+    title: string,
+    author: string | undefined,
+    kind: LibraryKind,
+  ) =>
+    call<LibraryItem>("library_upload", { sourcePath, title, author, kind }),
+  libraryRemove: (id: string) => call<void>("library_remove", { id }),
+  librarySetLastPage: (id: string, page: number) =>
+    call<LibraryItem>("library_set_last_page", { id, page }),
+  libraryPickUploadFile: () => call<string | null>("library_pick_upload_file"),
 
   bookmarksList: () => call<Bookmark[]>("bookmarks_list"),
   bookmarkAdd: (url: string) => call<Bookmark>("bookmark_add", { url }),

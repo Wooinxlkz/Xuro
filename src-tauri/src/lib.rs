@@ -15,6 +15,7 @@ mod error;
 mod graph;
 mod link_meta;
 mod linux_webkit;
+mod library;
 mod locks;
 mod notes;
 mod obsidian_import;
@@ -28,6 +29,7 @@ mod todos;
 mod tray;
 mod util;
 mod vault;
+mod vault_crypto;
 
 use commands::AppState;
 use tauri::{Manager, WindowEvent};
@@ -169,6 +171,14 @@ pub fn run() {
             commands::board_create,
             commands::board_rename,
             commands::board_delete,
+            commands::library_list,
+            commands::library_search_books,
+            commands::library_search_manga,
+            commands::library_add_from_search,
+            commands::library_upload,
+            commands::library_remove,
+            commands::library_set_last_page,
+            commands::library_pick_upload_file,
             commands::bookmarks_list,
             commands::bookmark_add,
             commands::bookmark_update_title,
