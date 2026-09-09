@@ -239,6 +239,48 @@
     --line: #2b2a24;
     --line-soft: #21201c;
 }
+:root[data-bg="mossy-hollow"] {
+    --bg: #f3f6ee;
+    --panel: #e9efdf;
+    --sunken: #dbe4c9;
+    --line: #d7e0c5;
+    --line-soft: #e3ead4;
+}
+.dark[data-bg="mossy-hollow"] {
+    --bg: #171b13;
+    --panel: #12150f;
+    --sunken: #0c0f09;
+    --line: #212a1a;
+    --line-soft: #1a2015;
+}
+:root[data-bg="chocolate-truffle"] {
+    --bg: #f7f1ec;
+    --panel: #efe4da;
+    --sunken: #e3d2c2;
+    --line: #ddcbb8;
+    --line-soft: #e8dccc;
+}
+.dark[data-bg="chocolate-truffle"] {
+    --bg: #1d1712;
+    --panel: #17120d;
+    --sunken: #100c08;
+    --line: #2c2018;
+    --line-soft: #221912;
+}
+:root[data-bg="ink-wash"] {
+    --bg: #f4f5f6;
+    --panel: #e9ebed;
+    --sunken: #dadde1;
+    --line: #d6d9dd;
+    --line-soft: #e2e4e7;
+}
+.dark[data-bg="ink-wash"] {
+    --bg: #15171a;
+    --panel: #101214;
+    --sunken: #0a0b0d;
+    --line: #23262b;
+    --line-soft: #1b1d21;
+}
 
 html,
 body,

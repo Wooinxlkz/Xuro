@@ -10,6 +10,24 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.1.2",
+    date: "2026-09-09",
+    displayDate: "September 9, 2026",
+    title: "Graph polish, a real PDF reader, and snippet previews",
+    summary:
+      "Uploaded PDFs now open in a real in-app reader, HTML/CSS/JS snippets get a live sandboxed preview, and the Graph view got a round of polish.",
+    changes: [
+      "Fixed the Graph view showing the OS's native right-click menu underneath Xuro's own.",
+      "Added a retry with backoff for Library search requests (Open Library, Jikan) to smooth over the occasional 502/503/504 both free public APIs return under load.",
+      "Graph folders are outlined only now — no filled background, just a colored dashed border — plus a filter box, a Rename action, and a New note action from the canvas.",
+      "Library upload now picks the file first and pre-fills its title from the filename, editable before you confirm.",
+      "Added three more Background presets in Settings: Mossy Hollow, Chocolate Truffle, and Ink Wash.",
+      "Uploaded PDFs open in a real in-app reader (page navigation, zoom) instead of only your system's default viewer.",
+      "Snippets: HTML, CSS, and JavaScript snippets get a live, sandboxed Preview right in the card — JavaScript previews include p5.js bundled in.",
+    ],
+    releaseUrl: "https://github.com/Wooinxlkz/Xuro/releases/tag/v0.1.2",
+  },
+  {
     version: "0.1.1",
     date: "2026-09-08",
     displayDate: "September 8, 2026",

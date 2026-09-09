@@ -178,6 +178,7 @@ pub fn run() {
             commands::library_upload,
             commands::library_remove,
             commands::library_set_last_page,
+            commands::library_read_file,
             commands::library_pick_upload_file,
             commands::bookmarks_list,
             commands::bookmark_add,

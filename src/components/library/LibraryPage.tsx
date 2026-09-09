@@ -1,4 +1,4 @@
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   BookOpen,
   Grid2x2,
@@ -19,6 +19,7 @@ import { cx } from "@/lib/utils";
 import type { LibraryItem, LibraryKind, LibrarySearchResult } from "@/lib/types";
 import { useLibrary, type LibraryViewMode } from "@/stores/library";
 import { useVault } from "@/stores/vault";
+import { PdfReader } from "./PdfReader";
 
 const VIEW_MODES: Array<{ mode: LibraryViewMode; icon: typeof List; label: string }> = [
   { mode: "list", icon: List, label: "List" },
@@ -27,17 +28,19 @@ const VIEW_MODES: Array<{ mode: LibraryViewMode; icon: typeof List; label: strin
 ];
 
 export function LibraryPage() {
-  const { items, loaded, viewMode, searchKind, searchResults, searching } = useLibrary();
+  const { items, loaded, viewMode, searchKind, searchResults, searching, pickedFile } =
+    useLibrary();
   const load = useLibrary((s) => s.load);
   const setViewMode = useLibrary((s) => s.setViewMode);
   const setSearchKind = useLibrary((s) => s.setSearchKind);
   const search = useLibrary((s) => s.search);
   const addFromSearch = useLibrary((s) => s.addFromSearch);
+  const pickFile = useLibrary((s) => s.pickFile);
   const remove = useLibrary((s) => s.remove);
   const root = useVault((s) => s.root);
 
   const [query, setQuery] = useState("");
-  const [uploadOpen, setUploadOpen] = useState(false);
+  const [readingItem, setReadingItem] = useState<LibraryItem | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -52,7 +55,14 @@ export function LibraryPage() {
 
   const openFile = (item: LibraryItem) => {
     if (!item.fileRel || !root) return;
-    void revealItemInDir(`${root}/${item.fileRel}`).catch((error) =>
+    if (item.fileRel.toLowerCase().endsWith(".pdf")) {
+      setReadingItem(item);
+      return;
+    }
+    // EPUB/CBZ/CBR don't have an in-app reader yet — open with whatever
+    // the system already handles that format with (its default app), same
+    // as before.
+    void openUrl(`${root}/${item.fileRel}`).catch((error) =>
       toast.error(error instanceof Error ? error.message : String(error)),
     );
   };
@@ -116,7 +126,7 @@ export function LibraryPage() {
               onChange={(e) => onQueryChange(e.target.value)}
             />
           </div>
-          <Button size="md" variant="secondary" onClick={() => setUploadOpen(true)}>
+          <Button size="md" variant="secondary" onClick={() => void pickFile()}>
             <Upload size={14} strokeWidth={2} />
             Upload
           </Button>
@@ -150,7 +160,8 @@ export function LibraryPage() {
         </div>
       </div>
 
-      <UploadDialog open={uploadOpen} onClose={() => setUploadOpen(false)} defaultKind={searchKind} />
+      {pickedFile && <UploadDialog defaultKind={searchKind} />}
+      {readingItem && <PdfReader item={readingItem} onClose={() => setReadingItem(null)} />}
     </div>
   );
 }
@@ -351,39 +362,31 @@ function RowActions({
   );
 }
 
-function UploadDialog({
-  open,
-  onClose,
-  defaultKind,
-}: {
-  open: boolean;
-  onClose: () => void;
-  defaultKind: LibraryKind;
-}) {
-  const uploadPicked = useLibrary((s) => s.uploadPicked);
+function UploadDialog({ defaultKind }: { defaultKind: LibraryKind }) {
+  const pickedFile = useLibrary((s) => s.pickedFile);
+  const clearPickedFile = useLibrary((s) => s.clearPickedFile);
+  const confirmUpload = useLibrary((s) => s.confirmUpload);
   const uploading = useLibrary((s) => s.uploading);
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(pickedFile?.suggestedTitle ?? "");
   const [author, setAuthor] = useState("");
   const [kind, setKind] = useState<LibraryKind>(defaultKind);
 
+  // The dialog only ever mounts once a file's already been picked (see the
+  // `pickedFile &&` guard where this is rendered), so this fires exactly
+  // once per pick to seed the title from the filename.
   useEffect(() => {
-    if (open) {
-      setTitle("");
-      setAuthor("");
-      setKind(defaultKind);
-    }
-  }, [open, defaultKind]);
+    if (pickedFile) setTitle(pickedFile.suggestedTitle);
+  }, [pickedFile]);
 
   const submit = async () => {
     if (!title.trim()) return;
-    await uploadPicked(title.trim(), author.trim() || undefined, kind);
-    onClose();
+    await confirmUpload(title.trim(), author.trim() || undefined, kind);
   };
 
   return (
-    <Modal open={open} onClose={onClose} ariaLabel="Upload a book or manga">
+    <Modal open onClose={clearPickedFile} ariaLabel="Upload a book or manga">
       <div className="w-[320px] rounded-xl border border-line bg-bg p-4">
-        <p className="mb-3 text-[13.5px] font-semibold text-ink">Upload a file</p>
+        <p className="mb-3 text-[13.5px] font-semibold text-ink">Add to your library</p>
         <div className="flex flex-col gap-2.5">
           <Input
             autoFocus
@@ -411,8 +414,8 @@ function UploadDialog({
               </button>
             ))}
           </div>
-          <p className="text-[10.5px] text-faint">
-            PDF, EPUB, CBZ, or CBR. Saved into your vault's Library folder.
+          <p className="truncate text-[10.5px] text-faint" title={pickedFile?.path}>
+            {pickedFile?.path.split(/[/\\]/).pop()}
           </p>
           <Button
             size="md"
@@ -422,7 +425,7 @@ function UploadDialog({
             onClick={() => void submit()}
           >
             <Upload size={14} strokeWidth={2} />
-            Choose file & upload
+            Add to library
           </Button>
         </div>
       </div>

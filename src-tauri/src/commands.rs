@@ -703,6 +703,17 @@ pub fn library_set_last_page(
     library::set_last_page(&state.root()?, &id, page)
 }
 
+/// Base64-encoded bytes of an uploaded library file, for the in-app PDF
+/// reader. Deliberately not the Tauri asset protocol / an `<iframe src>` —
+/// reading bytes over the existing command channel needs no asset-scope or
+/// CSP changes at all, at the cost of holding the whole file in memory
+/// once. Fine for a typical ebook/PDF; a very large scanned volume will be
+/// slower to open.
+#[tauri::command]
+pub fn library_read_file(state: State<'_, AppState>, id: String) -> AppResult<String> {
+    library::read_file_base64(&state.root()?, &id)
+}
+
 /// Open a native file picker for a book/manga file to upload. Returns the
 /// picked path as a string for the frontend to pass straight to
 /// `library_upload`; async for the same reason as `choose_vault` — the

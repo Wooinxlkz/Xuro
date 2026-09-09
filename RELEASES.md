@@ -2,6 +2,27 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
+## [0.1.2] — September 9, 2026
+
+Graph polish, a real PDF reader, and snippet previews
+
+### Fixes
+
+- Graph: right-clicking a note or folder no longer shows the OS's native context menu underneath Xuro's own.
+- Library search: added a retry with backoff for Open Library/Jikan requests, since both are free public APIs that occasionally bounce a request with a 502/503/504 under load — most of what looked like a hang or an error before now quietly retries and succeeds.
+
+### Changed
+
+- Graph: folders are outlined only now — no filled background, just a colored, dashed border (and the label is tinted the same color), per feedback that the fill read as too loud.
+- Graph: added a filter box that dims everything not matching what you type, a Rename action on notes and folders, and a "New note" action on right-clicking empty canvas.
+- Library upload: pick the file first, then its title is pre-filled from the filename (still fully editable) instead of asking for a title before you've even chosen a file.
+- Settings → Background: added three more presets — Mossy Hollow, Chocolate Truffle, and Ink Wash — alongside Default, Cream, and Soft.
+
+### Features
+
+- Library: uploaded PDFs now open in a real in-app reader (page navigation, zoom, page counter) instead of only handing off to your system's default viewer. EPUB/CBZ/CBR still open externally for now.
+- Snippets: HTML, CSS, and JavaScript snippets get a live Preview — a sandboxed, one-click render of the snippet's actual output, right in its card. JavaScript previews include p5.js bundled in, so a sketch just runs.
+
 ## [0.1.1] — September 8, 2026
 
 Real vault encryption, and a Library

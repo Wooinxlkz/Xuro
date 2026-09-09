@@ -91,6 +91,9 @@ const BACKGROUND_STYLES: Array<{
   { value: "default", label: "Default", description: "Cool neutral canvas", preview: "#fbfbfa" },
   { value: "cream", label: "Cream", description: "Warm paper tone", preview: "#faf6ec" },
   { value: "soft", label: "Soft", description: "Muted warm gray", preview: "#f7f6f3" },
+  { value: "mossy-hollow", label: "Mossy Hollow", description: "Sage green canvas", preview: "#f3f6ee" },
+  { value: "chocolate-truffle", label: "Chocolate Truffle", description: "Warm cocoa tone", preview: "#f7f1ec" },
+  { value: "ink-wash", label: "Ink Wash", description: "Cool grey wash", preview: "#f4f5f6" },
 ];
 
 export function GeneralSettings() {

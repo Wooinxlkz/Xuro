@@ -50,12 +50,15 @@ pub enum AccentColor {
 /// surfaces in both light and dark mode. "Default" is the existing palette,
 /// unchanged.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum BackgroundStyle {
     #[default]
     Default,
     Cream,
     Soft,
+    MossyHollow,
+    ChocolateTruffle,
+    InkWash,
 }
 
 fn config_file(app: &tauri::AppHandle) -> AppResult<PathBuf> {

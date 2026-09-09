@@ -1,10 +1,11 @@
-import { Code2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Code2, Pencil, Play, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { useSnippets } from "@/stores/snippets";
 import type { Snippet } from "@/lib/types";
 import { COMMON_LANGUAGES, highlightCode } from "./highlight";
+import { isPreviewable, SnippetPreview } from "./SnippetPreview";
 
 export function SnippetsPage() {
   const { snippets, loaded, load, add, update, remove } = useSnippets();
@@ -123,6 +124,7 @@ function SnippetCard({
   onDelete: () => void;
 }) {
   const [html, setHtml] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,6 +146,18 @@ function SnippetCard({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
+          {isPreviewable(snippet.language) && (
+            <button
+              type="button"
+              aria-label={previewing ? "Hide preview" : "Preview snippet"}
+              onClick={() => setPreviewing((p) => !p)}
+              className={`grid h-7 w-7 place-items-center rounded-md transition-colors duration-100 ${
+                previewing ? "bg-active text-ink" : "text-faint hover:bg-active hover:text-ink"
+              }`}
+            >
+              <Play size={12.5} strokeWidth={1.8} />
+            </button>
+          )}
           <CopyButton value={snippet.content} label="Copy snippet" />
           <button
             type="button"
@@ -170,6 +184,7 @@ function SnippetCard({
           <code>{snippet.content}</code>
         )}
       </pre>
+      {previewing && <SnippetPreview snippet={snippet} onClose={() => setPreviewing(false)} />}
     </div>
   );
 }

@@ -5,6 +5,24 @@ import type { LibraryItem, LibraryKind, LibrarySearchResult } from "@/lib/types"
 
 export type LibraryViewMode = "list" | "grid" | "bento";
 
+/** "my-scanned_book-v2.pdf" -> "my scanned book v2" -> "My Scanned Book V2" —
+ * a reasonable, editable starting point rather than making the person type
+ * a title from scratch for every upload. */
+export function titleFromFilename(path: string): string {
+  const base = path.split(/[/\\]/).pop() ?? path;
+  const withoutExt = base.replace(/\.[^./\\]+$/, "");
+  const spaced = withoutExt.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  return spaced
+    .split(" ")
+    .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word))
+    .join(" ");
+}
+
+interface PickedFile {
+  path: string;
+  suggestedTitle: string;
+}
+
 interface LibraryState {
   items: LibraryItem[];
   loaded: boolean;
@@ -14,13 +32,17 @@ interface LibraryState {
   searchResults: LibrarySearchResult[];
   searching: boolean;
   uploading: boolean;
+  /** Set once a file's been picked, before the person confirms title/author/kind. */
+  pickedFile: PickedFile | null;
 
   setViewMode: (mode: LibraryViewMode) => void;
   setSearchKind: (kind: LibraryKind) => void;
   load: () => Promise<void>;
   search: (query: string) => Promise<void>;
   addFromSearch: (result: LibrarySearchResult) => Promise<void>;
-  uploadPicked: (title: string, author: string | undefined, kind: LibraryKind) => Promise<void>;
+  pickFile: () => Promise<void>;
+  clearPickedFile: () => void;
+  confirmUpload: (title: string, author: string | undefined, kind: LibraryKind) => Promise<void>;
   remove: (id: string) => Promise<void>;
 }
 
@@ -36,6 +58,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   searchResults: [],
   searching: false,
   uploading: false,
+  pickedFile: null,
 
   setViewMode: (mode) => set({ viewMode: mode }),
   setSearchKind: (kind) => set({ searchKind: kind, searchResults: [] }),
@@ -85,13 +108,28 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     }
   },
 
-  uploadPicked: async (title, author, kind) => {
-    set({ uploading: true });
+  // Picking happens first, standalone — the title/author/kind dialog only
+  // opens once a file is actually chosen, and its title starts pre-filled
+  // from the filename instead of asking the person to type one blind.
+  pickFile: async () => {
     try {
       const path = await ipc.libraryPickUploadFile();
       if (!path) return;
-      const item = await ipc.libraryUpload(path, title, author, kind);
-      set({ items: [item, ...get().items] });
+      set({ pickedFile: { path, suggestedTitle: titleFromFilename(path) } });
+    } catch (err) {
+      oops(err);
+    }
+  },
+
+  clearPickedFile: () => set({ pickedFile: null }),
+
+  confirmUpload: async (title, author, kind) => {
+    const picked = get().pickedFile;
+    if (!picked) return;
+    set({ uploading: true });
+    try {
+      const item = await ipc.libraryUpload(picked.path, title, author, kind);
+      set({ items: [item, ...get().items], pickedFile: null });
     } catch (err) {
       oops(err);
     } finally {

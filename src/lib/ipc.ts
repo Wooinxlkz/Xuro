@@ -183,6 +183,7 @@ export const ipc = {
   libraryRemove: (id: string) => call<void>("library_remove", { id }),
   librarySetLastPage: (id: string, page: number) =>
     call<LibraryItem>("library_set_last_page", { id, page }),
+  libraryReadFile: (id: string) => call<string>("library_read_file", { id }),
   libraryPickUploadFile: () => call<string | null>("library_pick_upload_file"),
 
   bookmarksList: () => call<Bookmark[]>("bookmarks_list"),

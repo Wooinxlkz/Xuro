@@ -9,7 +9,13 @@ export type AccentColor =
   | "orange"
   | "custom";
 
-export type BackgroundStyle = "default" | "cream" | "soft";
+export type BackgroundStyle =
+  | "default"
+  | "cream"
+  | "soft"
+  | "mossy-hollow"
+  | "chocolate-truffle"
+  | "ink-wash";
 
 export type NodeKind = "folder" | "note" | "canvas";
 

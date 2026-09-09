@@ -1,12 +1,15 @@
 import type { Core, NodeSingular } from "cytoscape";
 import {
+  FilePlus,
   FileText,
   FolderOpen,
   Info,
   Maximize2,
   Minimize2,
+  Pencil,
   Pin,
   PinOff,
+  Search,
   ScanSearch,
   Waypoints,
 } from "lucide-react";
@@ -30,13 +33,9 @@ function isDarkMode(): boolean {
   return document.documentElement.classList.contains("dark");
 }
 
-/** hue -> a background tint that reads as "slightly colored", not loud. */
-function folderFill(hue: number): string {
-  return `hsl(${hue}, 38%, ${isDarkMode() ? "20%" : "90%"})`;
-}
-
+/** No fill — folders are just a colored, dashed outline, not a solid box. */
 function folderBorder(hue: number): string {
-  return `hsl(${hue}, 42%, ${isDarkMode() ? "38%" : "72%"})`;
+  return `hsl(${hue}, 65%, ${isDarkMode() ? "58%" : "45%"})`;
 }
 
 function formatBytes(bytes: number): string {
@@ -96,6 +95,17 @@ export function GraphView() {
     name: string;
   } | null>(null);
   const [info, setInfo] = useState<InfoTarget | null>(null);
+  const [query, setQuery] = useState("");
+  const [renaming, setRenaming] = useState<{
+    rel: string;
+    kind: "note" | "folder";
+    value: string;
+  } | null>(null);
+  const [bgMenu, setBgMenu] = useState<MenuPosition | null>(null);
+
+  const reloadGraph = () => {
+    void ipc.graphData().then(setGraph);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +151,7 @@ export function GraphView() {
     let cancelled = false;
     let cy: Core | null = null;
     let resizeObserver: ResizeObserver | null = null;
+    let removeContextMenuBlock: (() => void) | null = null;
 
     void (async () => {
       // cytoscape is a real dependency here (not just type-only) but it's
@@ -227,18 +238,21 @@ export function GraphView() {
             selector: "node[?isFolder]",
             style: {
               shape: "round-rectangle",
-              "background-color": (el: NodeSingular) => folderFill(el.data("hue")),
-              "background-opacity": 1,
-              "border-width": 1,
+              // No fill — the user asked for colored borders, not colored
+              // boxes. "background-opacity: 0" keeps the shape (so the
+              // dashed outline still reads as a container) without ever
+              // painting over what's inside it.
+              "background-opacity": 0,
+              "border-width": 1.5,
               "border-color": (el: NodeSingular) => folderBorder(el.data("hue")),
-              "border-style": "solid",
+              "border-style": "dashed",
               label: "data(label)",
               "text-valign": "top",
               "text-halign": "center",
               "text-margin-y": -6,
               "font-size": 10.5,
               "font-weight": 600,
-              color: cssVar("--muted") || "#9a9a9a",
+              color: (el: NodeSingular) => folderBorder(el.data("hue")),
               padding: "18px",
               "compound-sizing-wrt-labels": "include",
             },
@@ -297,6 +311,24 @@ export function GraphView() {
         }
       });
 
+      // Right-clicking empty canvas (not a node) offers a lightweight
+      // "New note" action — `cxttap` on the core itself (rather than the
+      // "node" selector above) only fires for clicks that hit no element.
+      instance.on("cxttap", (event) => {
+        if (event.target !== instance) return;
+        const position = { x: event.originalEvent.clientX, y: event.originalEvent.clientY };
+        setBgMenu(position);
+      });
+
+      // Cytoscape's own `cxttap` above only drives *our* menu — the
+      // browser/webview still fires its native right-click menu underneath
+      // unless we stop it here too, which is why right-clicking a node
+      // used to show both at once.
+      const blockNativeContextMenu = (event: MouseEvent) => event.preventDefault();
+      container.addEventListener("contextmenu", blockNativeContextMenu);
+      removeContextMenuBlock = () =>
+        container.removeEventListener("contextmenu", blockNativeContextMenu);
+
       instance.on("mouseover", "node", (event) => {
         event.target.connectedEdges().style("opacity", 1);
         container.style.setProperty("cursor", "pointer");
@@ -326,6 +358,7 @@ export function GraphView() {
     return () => {
       cancelled = true;
       resizeObserver?.disconnect();
+      removeContextMenuBlock?.();
       cy?.destroy();
       cyRef.current = null;
     };
@@ -351,8 +384,66 @@ export function GraphView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsed, graph]);
 
+  // Search dims everything that doesn't match instead of hiding it — a
+  // lighter touch than filtering outright, and it keeps the layout stable
+  // while you type instead of re-flowing the whole graph on every keystroke.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const term = query.trim().toLowerCase();
+    cy.batch(() => {
+      if (!term) {
+        cy.elements().style("opacity", "");
+        return;
+      }
+      const matchedIds = new Set<string>();
+      cy.nodes().forEach((node) => {
+        const label = (node.data("label") as string | undefined)?.toLowerCase() ?? "";
+        const matches = label.includes(term);
+        if (matches) matchedIds.add(node.id());
+        node.style("opacity", matches ? 1 : 0.12);
+      });
+      cy.edges().forEach((edge) => {
+        const bothMatch =
+          matchedIds.has(edge.source().id()) && matchedIds.has(edge.target().id());
+        edge.style("opacity", bothMatch ? 0.55 : 0.05);
+      });
+    });
+  }, [query, graph]);
+
   const closeNodeMenu = () => setNodeMenu(null);
   const closeFolderMenu = () => setFolderMenu(null);
+
+  const submitRename = async () => {
+    if (!renaming) return;
+    const value = renaming.value.trim();
+    if (!value) {
+      setRenaming(null);
+      return;
+    }
+    try {
+      await ipc.renameEntry(renaming.rel, value);
+      reloadGraph();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+    setRenaming(null);
+  };
+
+  const bgMenuItems: MenuItem[] = bgMenu
+    ? [
+        {
+          label: "New note",
+          icon: FilePlus,
+          onSelect: () => {
+            void ipc.createNote("", "Untitled").then((rel) => {
+              reloadGraph();
+              setView({ type: "note", rel });
+            });
+          },
+        },
+      ]
+    : [];
 
   const nodeMenuItems: MenuItem[] = nodeMenu
     ? (() => {
@@ -373,6 +464,12 @@ export function GraphView() {
             label: "Reveal in sidebar",
             icon: ScanSearch,
             onSelect: () => expandTo(nodeMenu.rel),
+          },
+          {
+            label: "Rename",
+            icon: Pencil,
+            onSelect: () =>
+              setRenaming({ rel: nodeMenu.rel, kind: "note", value: nodeMenu.title }),
           },
           {
             label: isMac() ? "Reveal in Finder" : "Open file location",
@@ -409,6 +506,16 @@ export function GraphView() {
                 if (next.has(folderMenu.rel)) next.delete(folderMenu.rel);
                 else next.add(folderMenu.rel);
                 return next;
+              }),
+          },
+          {
+            label: "Rename",
+            icon: Pencil,
+            onSelect: () =>
+              setRenaming({
+                rel: folderMenu.rel,
+                kind: "folder",
+                value: fullFolder?.name ?? folderMenu.name,
               }),
           },
           {
@@ -450,15 +557,26 @@ export function GraphView() {
         </div>
       )}
       {!loading && graph && graph.nodes.length > 0 && (
-        <Tooltip label="Fit to view" side="left">
-          <button
-            type="button"
-            onClick={() => cyRef.current?.layout(COSE_LAYOUT).run()}
-            className="absolute right-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-md border border-line-soft bg-panel text-faint transition-colors duration-100 hover:bg-hover hover:text-ink"
-          >
-            <ScanSearch size={13.5} strokeWidth={1.8} />
-          </button>
-        </Tooltip>
+        <>
+          <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-md border border-line-soft bg-panel px-2 py-1">
+            <Search size={12.5} strokeWidth={1.8} className="text-faint" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Filter notes…"
+              className="w-[140px] bg-transparent text-[11.5px] text-ink outline-none placeholder:text-faint"
+            />
+          </div>
+          <Tooltip label="Fit to view" side="left">
+            <button
+              type="button"
+              onClick={() => cyRef.current?.layout(COSE_LAYOUT).run()}
+              className="absolute right-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-md border border-line-soft bg-panel text-faint transition-colors duration-100 hover:bg-hover hover:text-ink"
+            >
+              <ScanSearch size={13.5} strokeWidth={1.8} />
+            </button>
+          </Tooltip>
+        </>
       )}
       <div ref={containerRef} className="h-full w-full" />
       {nodeMenu && (
@@ -471,7 +589,58 @@ export function GraphView() {
           onClose={closeFolderMenu}
         />
       )}
+      {bgMenu && (
+        <ContextMenu position={bgMenu} items={bgMenuItems} onClose={() => setBgMenu(null)} />
+      )}
       {info && <InfoPanel target={info} onClose={() => setInfo(null)} />}
+      {renaming && (
+        <RenameOverlay
+          value={renaming.value}
+          kind={renaming.kind}
+          onChange={(value) => setRenaming({ ...renaming, value })}
+          onSubmit={() => void submitRename()}
+          onCancel={() => setRenaming(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Small floating rename prompt — opened from the "Rename" context menu
+ * item on either a note or a folder node, confirmed with Enter. */
+function RenameOverlay({
+  value,
+  kind,
+  onChange,
+  onSubmit,
+  onCancel,
+}: {
+  value: string;
+  kind: "note" | "folder";
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-40" onMouseDown={onCancel}>
+      <div
+        className="absolute left-1/2 top-1/2 w-[260px] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line bg-bg p-3 shadow-lg shadow-black/8 dark:shadow-black/40"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <p className="mb-2 text-[12px] font-medium text-muted">
+          Rename {kind === "note" ? "note" : "folder"}
+        </p>
+        <input
+          autoFocus
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") onSubmit();
+            if (event.key === "Escape") onCancel();
+          }}
+          className="h-8 w-full rounded-md border border-line-soft bg-panel px-2.5 text-[12.5px] text-ink outline-none focus-visible:border-ink/40"
+        />
+      </div>
     </div>
   );
 }

@@ -23,11 +23,13 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::cloud::client;
 use crate::error::{AppError, AppResult};
 use crate::util::{now_ms, sanitize_name};
 use crate::vault::{notes_root, rel_of, DATA_DIR};
@@ -76,6 +78,55 @@ pub struct LibrarySearchResult {
     pub kind: LibraryKind,
     pub cover_url: Option<String>,
     pub year: Option<i32>,
+}
+
+/// GETs `url` and parses it as JSON, retrying once on a transient 5xx
+/// (502/503/504) — both Open Library and Jikan are free, best-effort public
+/// APIs that are known to occasionally bounce a request under load, and a
+/// short retry clears most of those without the person having to manually
+/// search again. Non-5xx failures (a real 4xx, a malformed response) are
+/// never retried — retrying those would just waste the same amount of time
+/// arriving at the same error.
+async fn fetch_json_with_retry<T: for<'de> Deserialize<'de>>(
+    url: &str,
+    source_name: &str,
+) -> AppResult<T> {
+    let http = reqwest::Client::builder()
+        .timeout(Duration::from_secs(12))
+        .user_agent("Xuro/0.1.6")
+        .build()
+        .map_err(|error| AppError::Network(error.to_string()))?;
+
+    let mut last_error = None;
+    for attempt in 0..2 {
+        if attempt > 0 {
+            tokio::time::sleep(Duration::from_millis(600)).await;
+        }
+        match http.get(url).send().await {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_success() {
+                    return response.json::<T>().await.map_err(|error| {
+                        AppError::Other(format!("invalid {source_name} response: {error}"))
+                    });
+                }
+                if status.is_server_error() {
+                    // Worth a retry — a 502/503/504 is the origin's own
+                    // gateway having a bad moment, not our request being
+                    // wrong.
+                    last_error = Some(AppError::Network(format!(
+                        "{source_name} returned {status}"
+                    )));
+                    continue;
+                }
+                return Err(AppError::Network(format!("{source_name} returned {status}")));
+            }
+            Err(error) => {
+                last_error = Some(AppError::Network(format!("{source_name}: {error}")));
+            }
+        }
+    }
+    Err(last_error.unwrap_or_else(|| AppError::Network(format!("{source_name} request failed"))))
 }
 
 fn store_path(root: &Path) -> PathBuf {
@@ -130,6 +181,24 @@ pub fn set_last_page(root: &Path, id: &str, page: u32) -> AppResult<LibraryItem>
     let updated = item.clone();
     save(root, &items)?;
     Ok(updated)
+}
+
+/// Base64-encoded raw bytes of an uploaded item's file — see the
+/// `library_read_file` command doc comment for why this is the read path
+/// instead of the asset protocol.
+pub fn read_file_base64(root: &Path, id: &str) -> AppResult<String> {
+    let items = read(root)?;
+    let item = items
+        .iter()
+        .find(|item| item.id == id)
+        .ok_or_else(|| AppError::NotFound(id.to_string()))?;
+    let file_rel = item
+        .file_rel
+        .as_ref()
+        .ok_or_else(|| AppError::InvalidInput("this item has no uploaded file".to_string()))?;
+    let path = crate::vault::resolve_rel(root, file_rel)?;
+    let bytes = fs::read(path)?;
+    Ok(STANDARD.encode(bytes))
 }
 
 pub fn add_from_search(root: &Path, result: LibrarySearchResult) -> AppResult<LibraryItem> {
@@ -247,24 +316,10 @@ pub async fn search_books(query: &str) -> AppResult<Vec<LibrarySearchResult>> {
         return Ok(Vec::new());
     }
     let url = format!(
-        "https://openlibrary.org/search.json?q={}&limit=24&fields=key,title,author_name,cover_i,first_publish_year,subject",
+        "https://openlibrary.org/search.json?q={}&limit=15&fields=key,title,author_name,cover_i,first_publish_year,subject",
         urlencode(query)
     );
-    let response = client()?
-        .get(url)
-        .send()
-        .await
-        .map_err(|error| AppError::Network(error.to_string()))?;
-    if !response.status().is_success() {
-        return Err(AppError::Network(format!(
-            "Open Library returned {}",
-            response.status()
-        )));
-    }
-    let parsed = response
-        .json::<OpenLibraryResponse>()
-        .await
-        .map_err(|error| AppError::Other(format!("invalid Open Library response: {error}")))?;
+    let parsed: OpenLibraryResponse = fetch_json_with_retry(&url, "Open Library").await?;
 
     Ok(parsed
         .docs
@@ -351,24 +406,10 @@ pub async fn search_manga(query: &str) -> AppResult<Vec<LibrarySearchResult>> {
     // `sfw=true` is Jikan's own explicit-content filter; the extra local
     // check below is defense in depth in case a result ever slips through.
     let url = format!(
-        "https://api.jikan.moe/v4/manga?q={}&sfw=true&limit=24",
+        "https://api.jikan.moe/v4/manga?q={}&sfw=true&limit=15",
         urlencode(query)
     );
-    let response = client()?
-        .get(url)
-        .send()
-        .await
-        .map_err(|error| AppError::Network(error.to_string()))?;
-    if !response.status().is_success() {
-        return Err(AppError::Network(format!(
-            "Jikan returned {}",
-            response.status()
-        )));
-    }
-    let parsed = response
-        .json::<JikanResponse>()
-        .await
-        .map_err(|error| AppError::Other(format!("invalid Jikan response: {error}")))?;
+    let parsed: JikanResponse = fetch_json_with_retry(&url, "Jikan").await?;
 
     Ok(parsed
         .data
@@ -545,5 +586,36 @@ mod tests {
         let updated = set_last_page(dir.path(), &item.id, 42).unwrap();
         assert_eq!(updated.last_page, Some(42));
         assert_eq!(list(dir.path()).unwrap()[0].last_page, Some(42));
+    }
+
+    #[test]
+    fn read_file_base64_roundtrips_uploaded_bytes() {
+        let dir = tempdir().unwrap();
+        ensure_layout(dir.path()).unwrap();
+        let source_dir = tempdir().unwrap();
+        let source = source_dir.path().join("a.pdf");
+        fs::write(&source, b"%PDF-1.4 some bytes").unwrap();
+        let item = upload(dir.path(), source.to_str().unwrap(), "Readable", None, LibraryKind::Book)
+            .unwrap();
+
+        let encoded = read_file_base64(dir.path(), &item.id).unwrap();
+        let decoded = STANDARD.decode(encoded).unwrap();
+        assert_eq!(decoded, b"%PDF-1.4 some bytes");
+    }
+
+    #[test]
+    fn read_file_base64_errors_for_a_metadata_only_item() {
+        let dir = tempdir().unwrap();
+        ensure_layout(dir.path()).unwrap();
+        let result = LibrarySearchResult {
+            external_id: "1".to_string(),
+            title: "No File".to_string(),
+            author: None,
+            kind: LibraryKind::Book,
+            cover_url: None,
+            year: None,
+        };
+        let item = add_from_search(dir.path(), result).unwrap();
+        assert!(read_file_base64(dir.path(), &item.id).is_err());
     }
 }

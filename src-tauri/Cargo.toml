@@ -1,6 +1,6 @@
 [package]
 name = "Xuro"
-version = "0.1.1"
+version = "0.1.2"
 description = "Local-first markdown notes"
 authors = ["Xuro"]
 license-file = "LICENSE"
@@ -33,6 +33,7 @@ futures-util = "0.3"
 infer = "0.19"
 aes-gcm = "0.10"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+tokio = { version = "1", features = ["time"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2"
