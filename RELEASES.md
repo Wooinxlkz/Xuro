@@ -2,6 +2,26 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
+## [0.1.3] — September 10, 2026
+
+A real fix for the native context menu, a richer reader, and a debug log
+
+### Fixes
+
+- Graph: the native OS/webview right-click menu showing up alongside Xuro's own is now blocked globally (once, at the app root) instead of per-component — the previous, narrower fix apparently wasn't catching every case.
+- Library: items added from search (no file, just catalog metadata) can now have a file attached to them directly — "Attach file" replaces the missing Read button, and keeps the item's title/author/cover from the search result instead of creating a duplicate entry.
+- Library: the saved-items grid ("Your library") no longer disappears behind the catalog search results — it stays visible, is clearly labeled separately from "Add from catalog", and filters alongside the same search box so you can tell at a glance what you already have.
+- PDF reader: fixed a state-leak where reopening a different PDF right after closing one could carry over the previous file's page/zoom.
+
+### Features
+
+- Debug log: Xuro now keeps a local, timestamped record of unexpected errors — frontend JS errors, unhandled promise rejections, and Rust panics — viewable (and clearable) from Settings → Debug. Nothing in it is sent anywhere; it's purely local, for troubleshooting.
+- PDF reader: a genuinely richer toolbar — fullscreen, fit-to-width, click-to-jump to a page, keyboard shortcuts (arrow keys, +/-, Esc), and an "open in default app" fallback both in the toolbar and on any load error.
+
+### Changed
+
+- Snippets: the Preview button now shows its label ("▶ Preview"), not just an icon, so it's not easy to miss on an HTML/CSS/JavaScript snippet's card.
+
 ## [0.1.2] — September 9, 2026
 
 Graph polish, a real PDF reader, and snippet previews

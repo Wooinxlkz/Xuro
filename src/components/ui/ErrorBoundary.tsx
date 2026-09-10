@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from "react";
+import { logCaughtError } from "@/lib/debugLog";
 
 interface Props {
   children: ReactNode;
@@ -18,6 +19,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error) {
     console.error("Xuro crashed:", error);
+    logCaughtError(error.message, error.stack);
   }
 
   render() {

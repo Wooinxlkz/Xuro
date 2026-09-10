@@ -695,6 +695,15 @@ pub fn library_remove(state: State<'_, AppState>, id: String) -> AppResult<()> {
 }
 
 #[tauri::command]
+pub fn library_attach_file(
+    state: State<'_, AppState>,
+    id: String,
+    source_path: String,
+) -> AppResult<LibraryItem> {
+    library::attach_file(&state.root()?, &id, &source_path)
+}
+
+#[tauri::command]
 pub fn library_set_last_page(
     state: State<'_, AppState>,
     id: String,
@@ -712,6 +721,29 @@ pub fn library_set_last_page(
 #[tauri::command]
 pub fn library_read_file(state: State<'_, AppState>, id: String) -> AppResult<String> {
     library::read_file_base64(&state.root()?, &id)
+}
+
+// ---- debug log ----
+
+#[tauri::command]
+pub fn debug_log_add(
+    app: AppHandle,
+    level: String,
+    source: String,
+    message: String,
+    context: Option<String>,
+) {
+    crate::debug_log::add(&app, &level, &source, &message, context);
+}
+
+#[tauri::command]
+pub fn debug_log_list(app: AppHandle) -> Vec<crate::debug_log::DebugEntry> {
+    crate::debug_log::list(&app)
+}
+
+#[tauri::command]
+pub fn debug_log_clear(app: AppHandle) -> AppResult<()> {
+    crate::debug_log::clear(&app)
 }
 
 /// Open a native file picker for a book/manga file to upload. Returns the

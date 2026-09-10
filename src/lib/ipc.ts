@@ -12,6 +12,7 @@ import type {
   PublishedShare,
   OtpChallenge,
   ObsidianImportSummary,
+  DebugEntry,
   Graph,
   LibraryItem,
   LibraryKind,
@@ -181,9 +182,20 @@ export const ipc = {
   ) =>
     call<LibraryItem>("library_upload", { sourcePath, title, author, kind }),
   libraryRemove: (id: string) => call<void>("library_remove", { id }),
+  libraryAttachFile: (id: string, sourcePath: string) =>
+    call<LibraryItem>("library_attach_file", { id, sourcePath }),
   librarySetLastPage: (id: string, page: number) =>
     call<LibraryItem>("library_set_last_page", { id, page }),
   libraryReadFile: (id: string) => call<string>("library_read_file", { id }),
+
+  debugLogAdd: (
+    level: "error" | "warn" | "panic",
+    source: "frontend" | "backend",
+    message: string,
+    context?: string,
+  ) => call<void>("debug_log_add", { level, source, message, context }),
+  debugLogList: () => call<DebugEntry[]>("debug_log_list"),
+  debugLogClear: () => call<void>("debug_log_clear"),
   libraryPickUploadFile: () => call<string | null>("library_pick_upload_file"),
 
   bookmarksList: () => call<Bookmark[]>("bookmarks_list"),

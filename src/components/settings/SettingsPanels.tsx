@@ -11,19 +11,21 @@ import {
   RotateCcw,
   ShieldCheck,
   Sun,
+  Trash2,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { version as appVersion } from "../../../package.json";
+import { ipc } from "@/lib/ipc";
 import type {
+  DebugEntry,
   AccentColor,
   BackgroundStyle,
   CloudAccount,
   ObsidianImportSummary,
   Theme,
 } from "@/lib/types";
-import { ipc } from "@/lib/ipc";
 import {
   findShortcutConflict,
   formatShortcutParts,
@@ -968,6 +970,103 @@ function ReadonlyShortcutRow({
           <Kbd key={`${label}-${key}-${index}`}>{key}</Kbd>
         ))}
       </span>
+    </div>
+  );
+}
+
+export function DebugSettings() {
+  const [entries, setEntries] = useState<DebugEntry[] | null>(null);
+  const [clearing, setClearing] = useState(false);
+
+  const load = () => {
+    void ipc.debugLogList().then(setEntries).catch(() => setEntries([]));
+  };
+
+  useEffect(load, []);
+
+  const clear = async () => {
+    setClearing(true);
+    try {
+      await ipc.debugLogClear();
+      setEntries([]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const copyAll = () => {
+    if (!entries || entries.length === 0) return;
+    const text = entries
+      .map((e) => `[${new Date(e.atMs).toISOString()}] ${e.level} (${e.source}): ${e.message}`)
+      .join("\n");
+    void navigator.clipboard.writeText(text);
+    toast.success("Copied");
+  };
+
+  return (
+    <div className="space-y-6">
+      <SettingsGroup
+        title="Diagnostics"
+        description="Unexpected errors Xuro has run into, kept locally with a timestamp — nothing here is sent anywhere."
+        aside={
+          entries && entries.length > 0 ? (
+            <div className="flex gap-1.5">
+              <Button variant="outline" size="sm" onClick={copyAll} className="bg-bg">
+                <Copy size={12.5} strokeWidth={1.75} />
+                Copy all
+              </Button>
+              <Button variant="outline" size="sm" loading={clearing} onClick={() => void clear()} className="bg-bg">
+                <Trash2 size={12.5} strokeWidth={1.75} />
+                Clear
+              </Button>
+            </div>
+          ) : undefined
+        }
+      >
+        {entries === null ? (
+          <p className="py-6 text-center text-[12px] text-faint">Loading…</p>
+        ) : entries.length === 0 ? (
+          <div className="rounded-xl border border-line-soft bg-panel px-4 py-8 text-center">
+            <p className="text-[12.5px] text-muted">No errors recorded</p>
+            <p className="mt-1 text-[11px] text-faint">
+              That's a good sign — this fills in automatically if something goes wrong.
+            </p>
+          </div>
+        ) : (
+          <div className="max-h-[360px] overflow-auto rounded-xl border border-line-soft bg-panel">
+            <ul className="divide-y divide-line-soft">
+              {entries.map((entry) => (
+                <li key={entry.id} className="px-3.5 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide ${
+                        entry.level === "panic"
+                          ? "bg-danger/10 text-danger"
+                          : entry.level === "warn"
+                            ? "bg-amber-500/10 text-amber-600"
+                            : "bg-danger/10 text-danger"
+                      }`}
+                    >
+                      {entry.level}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wide text-faint">
+                      {entry.source}
+                    </span>
+                    <span className="ml-auto text-[10.5px] text-faint">
+                      {new Date(entry.atMs).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="mt-1 break-words font-mono text-[11.5px] leading-5 text-muted">
+                    {entry.message}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </SettingsGroup>
     </div>
   );
 }

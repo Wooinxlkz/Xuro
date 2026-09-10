@@ -239,16 +239,7 @@ pub fn upload(
     if title.is_empty() {
         return Err(AppError::InvalidInput("title is empty".to_string()));
     }
-    let extension = source
-        .extension()
-        .map(|e| e.to_string_lossy().to_string())
-        .unwrap_or_default();
-
-    let folder = library_folder(root);
-    fs::create_dir_all(&folder)?;
-    let dest = available_path(&folder, &sanitize_name(title), &extension);
-    fs::copy(source, &dest)?;
-    let file_rel = rel_of(root, &dest)?;
+    let file_rel = copy_into_library(root, source, title)?;
 
     let item = LibraryItem {
         id: Uuid::new_v4().to_string(),
@@ -264,6 +255,42 @@ pub fn upload(
     items.insert(0, item.clone());
     save(root, &items)?;
     Ok(item)
+}
+
+/// Attaches a file to an item that was added from search (metadata only,
+/// no file yet) — same destination folder and naming as `upload`, but
+/// updates the existing entry's `file_rel` instead of creating a new one,
+/// so its title/author/cover from the catalog search are kept.
+pub fn attach_file(root: &Path, id: &str, source_path: &str) -> AppResult<LibraryItem> {
+    let source = Path::new(source_path);
+    if !source.is_file() {
+        return Err(AppError::NotFound(source_path.to_string()));
+    }
+    let mut items = read(root)?;
+    let item = items
+        .iter_mut()
+        .find(|item| item.id == id)
+        .ok_or_else(|| AppError::NotFound(id.to_string()))?;
+    let file_rel = copy_into_library(root, source, &item.title)?;
+    item.file_rel = Some(file_rel);
+    let updated = item.clone();
+    save(root, &items)?;
+    Ok(updated)
+}
+
+/// Shared by `upload` and `attach_file`: copies `source` into the vault's
+/// `Library/` folder under a name derived from `title`, de-duplicating
+/// against anything already there, and returns its new vault-relative path.
+fn copy_into_library(root: &Path, source: &Path, title: &str) -> AppResult<String> {
+    let extension = source
+        .extension()
+        .map(|e| e.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let folder = library_folder(root);
+    fs::create_dir_all(&folder)?;
+    let dest = available_path(&folder, &sanitize_name(title), &extension);
+    fs::copy(source, &dest)?;
+    rel_of(root, &dest)
 }
 
 /// `Some Title.pdf`, `Some Title 2.pdf`, ... — same de-duplication idea
@@ -525,6 +552,33 @@ mod tests {
             .unwrap();
         assert_eq!(first.file_rel.unwrap(), "Library/Same Title.pdf");
         assert_eq!(second.file_rel.unwrap(), "Library/Same Title 2.pdf");
+    }
+
+    #[test]
+    fn attach_file_gives_a_search_added_item_a_readable_file() {
+        let dir = tempdir().unwrap();
+        ensure_layout(dir.path()).unwrap();
+        let result = LibrarySearchResult {
+            external_id: "OL1W".to_string(),
+            title: "Dune".to_string(),
+            author: Some("Frank Herbert".to_string()),
+            kind: LibraryKind::Book,
+            cover_url: Some("https://covers.openlibrary.org/b/id/1-M.jpg".to_string()),
+            year: Some(1965),
+        };
+        let item = add_from_search(dir.path(), result).unwrap();
+        assert!(item.file_rel.is_none());
+
+        let source_dir = tempdir().unwrap();
+        let source = source_dir.path().join("dune.pdf");
+        fs::write(&source, b"scanned pages").unwrap();
+
+        let updated = attach_file(dir.path(), &item.id, source.to_str().unwrap()).unwrap();
+        assert_eq!(updated.id, item.id);
+        assert_eq!(updated.title, "Dune"); // title/author/cover untouched
+        assert_eq!(updated.author.as_deref(), Some("Frank Herbert"));
+        assert_eq!(updated.file_rel.as_deref(), Some("Library/Dune.pdf"));
+        assert!(notes_root(dir.path()).join("Library/Dune.pdf").is_file());
     }
 
     #[test]

@@ -227,3 +227,15 @@ export interface LibrarySearchResult {
   coverUrl: string | null;
   year: number | null;
 }
+
+export type DebugLevel = "error" | "warn" | "panic";
+export type DebugSource = "frontend" | "backend";
+
+export interface DebugEntry {
+  id: string;
+  atMs: number;
+  level: DebugLevel;
+  source: DebugSource;
+  message: string;
+  context: string | null;
+}

@@ -43,6 +43,7 @@ interface LibraryState {
   pickFile: () => Promise<void>;
   clearPickedFile: () => void;
   confirmUpload: (title: string, author: string | undefined, kind: LibraryKind) => Promise<void>;
+  attachFile: (id: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
 }
 
@@ -141,6 +142,20 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     try {
       await ipc.libraryRemove(id);
       set({ items: get().items.filter((item) => item.id !== id) });
+    } catch (err) {
+      oops(err);
+    }
+  },
+
+  // For an item that was added from search (metadata only, no file yet) —
+  // picks a file and attaches it to that *same* item, keeping its title,
+  // author, and cover instead of creating a duplicate entry.
+  attachFile: async (id) => {
+    try {
+      const path = await ipc.libraryPickUploadFile();
+      if (!path) return;
+      const updated = await ipc.libraryAttachFile(id, path);
+      set({ items: get().items.map((item) => (item.id === id ? updated : item)) });
     } catch (err) {
       oops(err);
     }

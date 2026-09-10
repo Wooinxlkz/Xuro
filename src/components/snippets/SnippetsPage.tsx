@@ -149,13 +149,13 @@ function SnippetCard({
           {isPreviewable(snippet.language) && (
             <button
               type="button"
-              aria-label={previewing ? "Hide preview" : "Preview snippet"}
               onClick={() => setPreviewing((p) => !p)}
-              className={`grid h-7 w-7 place-items-center rounded-md transition-colors duration-100 ${
+              className={`flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-colors duration-100 ${
                 previewing ? "bg-active text-ink" : "text-faint hover:bg-active hover:text-ink"
               }`}
             >
-              <Play size={12.5} strokeWidth={1.8} />
+              <Play size={11.5} strokeWidth={2} />
+              Preview
             </button>
           )}
           <CopyButton value={snippet.content} label="Copy snippet" />

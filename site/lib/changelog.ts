@@ -10,6 +10,24 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.1.3",
+    date: "2026-09-10",
+    displayDate: "September 10, 2026",
+    title: "A real fix for the native context menu, a richer reader, and a debug log",
+    summary:
+      "The Graph's double context menu is fixed for real this time, the PDF reader got a proper toolbar, and Xuro now keeps a local debug log for troubleshooting.",
+    changes: [
+      "Fixed the native OS/webview right-click menu showing up alongside Xuro's own on the Graph view — now blocked globally at the app root instead of per-component.",
+      "Library: items added from search (metadata only, no file) can now have a file attached directly via a new Attach file action, instead of having no way to read them.",
+      "Library: \"Your library\" stays visible and filters alongside the search box, clearly separated from the \"Add from catalog\" results above it.",
+      "PDF reader: fixed a state-leak where reopening a different PDF right after closing one could carry over the previous file's page/zoom.",
+      "Added a local debug log — frontend errors, unhandled promise rejections, and Rust panics, timestamped and viewable from Settings → Debug. Nothing in it is sent anywhere.",
+      "PDF reader: a genuinely richer toolbar — fullscreen, fit-to-width, click-to-jump to a page, keyboard shortcuts, and an open-in-default-app fallback.",
+      "Snippets: the Preview button now shows its label, not just an icon.",
+    ],
+    releaseUrl: "https://github.com/Wooinxlkz/Xuro/releases/tag/v0.1.3",
+  },
+  {
     version: "0.1.2",
     date: "2026-09-09",
     displayDate: "September 9, 2026",

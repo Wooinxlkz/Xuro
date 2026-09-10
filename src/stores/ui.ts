@@ -10,6 +10,7 @@ export type SettingsPage =
   | "cloud"
   | "appearance"
   | "shortcuts"
+  | "debug"
   | "about";
 
 interface UiState {

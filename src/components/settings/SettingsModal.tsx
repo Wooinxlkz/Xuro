@@ -1,4 +1,5 @@
 import {
+  Bug,
   Cloud,
   Info,
   Keyboard,
@@ -14,6 +15,7 @@ import {
   AboutSettings,
   AppearanceSettings,
   CloudSettings,
+  DebugSettings,
   GeneralSettings,
   ShortcutSettings,
 } from "@/components/settings/SettingsPanels";
@@ -53,6 +55,12 @@ const PAGES: Array<{
     icon: Keyboard,
   },
   {
+    id: "debug",
+    label: "Debug",
+    description: "Recent errors and diagnostics",
+    icon: Bug,
+  },
+  {
     id: "about",
     label: "About",
     description: "Version, credits, and sharing",
@@ -65,6 +73,7 @@ const PAGE_CONTENT: Record<SettingsPage, React.ComponentType> = {
   cloud: CloudSettings,
   appearance: AppearanceSettings,
   shortcuts: ShortcutSettings,
+  debug: DebugSettings,
   about: AboutSettings,
 };
 

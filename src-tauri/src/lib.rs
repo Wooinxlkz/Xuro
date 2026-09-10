@@ -11,6 +11,7 @@ mod cloud_publish;
 mod commands;
 mod config;
 mod daily_notes;
+mod debug_log;
 mod error;
 mod graph;
 mod link_meta;
@@ -83,6 +84,26 @@ pub fn run() {
         .manage(AppState::default())
         .setup(|app| {
             tray::setup(app.handle())?;
+
+            // Persist Rust panics (from any thread) to the debug log
+            // before the default hook runs — installed here rather than
+            // in main() so it can capture an AppHandle clone, which is
+            // what `debug_log::add` needs to find the log file. Chains to
+            // whatever hook was already installed (Rust's own default
+            // stderr printer, unless some other plugin got here first)
+            // rather than replacing it outright.
+            let panic_handle = app.handle().clone();
+            let previous_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |panic_info| {
+                debug_log::add(
+                    &panic_handle,
+                    "panic",
+                    "backend",
+                    &panic_info.to_string(),
+                    None,
+                );
+                previous_hook(panic_info);
+            }));
 
             // Closing the main window (the titlebar X) hides it instead of
             // destroying it, matching the tray icon we already ship — Xuro
@@ -177,8 +198,12 @@ pub fn run() {
             commands::library_add_from_search,
             commands::library_upload,
             commands::library_remove,
+            commands::library_attach_file,
             commands::library_set_last_page,
             commands::library_read_file,
+            commands::debug_log_add,
+            commands::debug_log_list,
+            commands::debug_log_clear,
             commands::library_pick_upload_file,
             commands::bookmarks_list,
             commands::bookmark_add,

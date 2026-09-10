@@ -10,7 +10,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -37,6 +37,7 @@ export function LibraryPage() {
   const addFromSearch = useLibrary((s) => s.addFromSearch);
   const pickFile = useLibrary((s) => s.pickFile);
   const remove = useLibrary((s) => s.remove);
+  const attachFile = useLibrary((s) => s.attachFile);
   const root = useVault((s) => s.root);
 
   const [query, setQuery] = useState("");
@@ -71,6 +72,19 @@ export function LibraryPage() {
     items.some(
       (item) => item.title === result.title && item.kind === result.kind && !item.fileRel,
     );
+
+  // The saved-items grid stays visible and filters alongside the catalog
+  // search instead of disappearing behind it — so typing a query answers
+  // both "what can I add?" and "do I already have this?" at once.
+  const libraryMatches = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter(
+      (item) =>
+        item.title.toLowerCase().includes(term) ||
+        (item.author?.toLowerCase().includes(term) ?? false),
+    );
+  }, [items, query]);
 
   if (!loaded) return null;
 
@@ -133,15 +147,30 @@ export function LibraryPage() {
         </div>
 
         {query.trim().length > 0 && (
-          <SearchResults
-            results={searchResults}
-            searching={searching}
-            onAdd={addFromSearch}
-            alreadySaved={alreadySaved}
-          />
+          <>
+            <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-faint">
+              Add from catalog
+            </p>
+            <SearchResults
+              results={searchResults}
+              searching={searching}
+              onAdd={addFromSearch}
+              alreadySaved={alreadySaved}
+            />
+          </>
         )}
 
         <div className="mt-5">
+          <div className="mb-2.5 flex items-center gap-2">
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">
+              Your library
+            </p>
+            {query.trim().length > 0 && (
+              <p className="text-[10.5px] text-faint">
+                {libraryMatches.length} matching "{query.trim()}"
+              </p>
+            )}
+          </div>
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
               <BookOpen size={22} strokeWidth={1.5} className="text-faint" />
@@ -150,18 +179,24 @@ export function LibraryPage() {
                 Search above to add a book or manga, or upload a file of your own.
               </p>
             </div>
+          ) : libraryMatches.length === 0 ? (
+            <p className="py-10 text-center text-[12px] text-faint">
+              Nothing in your library matches "{query.trim()}" — try "Add from catalog" above.
+            </p>
           ) : viewMode === "list" ? (
-            <ListView items={items} onOpen={openFile} onRemove={remove} />
+            <ListView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
           ) : viewMode === "grid" ? (
-            <GridView items={items} onOpen={openFile} onRemove={remove} />
+            <GridView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
           ) : (
-            <BentoView items={items} onOpen={openFile} onRemove={remove} />
+            <BentoView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
           )}
         </div>
       </div>
 
       {pickedFile && <UploadDialog defaultKind={searchKind} />}
-      {readingItem && <PdfReader item={readingItem} onClose={() => setReadingItem(null)} />}
+      {readingItem && (
+        <PdfReader key={readingItem.id} item={readingItem} onClose={() => setReadingItem(null)} />
+      )}
     </div>
   );
 }
@@ -242,10 +277,12 @@ function ListView({
   items,
   onOpen,
   onRemove,
+  onAttach,
 }: {
   items: LibraryItem[];
   onOpen: (item: LibraryItem) => void;
   onRemove: (id: string) => void;
+  onAttach: (id: string) => void;
 }) {
   return (
     <div className="flex flex-col divide-y divide-line-soft rounded-xl border border-line-soft bg-panel">
@@ -260,7 +297,7 @@ function ListView({
               {item.author ?? (item.kind === "book" ? "Book" : "Manga")}
             </p>
           </div>
-          <RowActions item={item} onOpen={onOpen} onRemove={onRemove} />
+          <RowActions item={item} onOpen={onOpen} onRemove={onRemove} onAttach={onAttach} />
         </div>
       ))}
     </div>
@@ -271,10 +308,12 @@ function GridView({
   items,
   onOpen,
   onRemove,
+  onAttach,
 }: {
   items: LibraryItem[];
   onOpen: (item: LibraryItem) => void;
   onRemove: (id: string) => void;
+  onAttach: (id: string) => void;
 }) {
   return (
     <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
@@ -283,7 +322,7 @@ function GridView({
           <div className="relative aspect-[2/3] w-full">
             <Cover item={item} />
             <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 p-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100">
-              <RowActions item={item} onOpen={onOpen} onRemove={onRemove} compact />
+              <RowActions item={item} onOpen={onOpen} onRemove={onRemove} onAttach={onAttach} compact />
             </div>
           </div>
           <p className="line-clamp-2 text-[11.5px] font-medium leading-tight text-ink">
@@ -299,10 +338,12 @@ function BentoView({
   items,
   onOpen,
   onRemove,
+  onAttach,
 }: {
   items: LibraryItem[];
   onOpen: (item: LibraryItem) => void;
   onRemove: (id: string) => void;
+  onAttach: (id: string) => void;
 }) {
   return (
     <div className="grid grid-flow-dense grid-cols-4 gap-3 sm:grid-cols-6">
@@ -318,7 +359,7 @@ function BentoView({
             <div className="relative aspect-[2/3] w-full flex-1">
               <Cover item={item} />
               <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 p-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100">
-                <RowActions item={item} onOpen={onOpen} onRemove={onRemove} compact />
+                <RowActions item={item} onOpen={onOpen} onRemove={onRemove} onAttach={onAttach} compact />
               </div>
             </div>
             <p
@@ -340,19 +381,31 @@ function RowActions({
   item,
   onOpen,
   onRemove,
+  onAttach,
   compact,
 }: {
   item: LibraryItem;
   onOpen: (item: LibraryItem) => void;
   onRemove: (id: string) => void;
+  onAttach: (id: string) => void;
   compact?: boolean;
 }) {
   return (
     <div className={cx("flex items-center gap-1", !compact && "shrink-0")}>
-      {item.fileRel && (
+      {item.fileRel ? (
         <Button size={compact ? "icon" : "sm"} variant="secondary" onClick={() => onOpen(item)}>
           <BookOpen size={13} strokeWidth={2} />
           {!compact && "Read"}
+        </Button>
+      ) : (
+        <Button
+          size={compact ? "icon" : "sm"}
+          variant="secondary"
+          onClick={() => onAttach(item.id)}
+          title="Upload a file for this to read it in Xuro"
+        >
+          <Upload size={13} strokeWidth={2} />
+          {!compact && "Attach file"}
         </Button>
       )}
       <Button size="icon" variant="ghost" onClick={() => onRemove(item.id)} aria-label="Remove">
