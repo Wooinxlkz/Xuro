@@ -430,7 +430,7 @@ function AllPagesView({
   pageCount: number;
   zoom: number;
   fitWidth: boolean;
-  containerRef: RefObject<HTMLDivElement>;
+  containerRef: RefObject<HTMLDivElement | null>;
   onVisiblePage: (page: number) => void;
   scrollToPageRef: MutableRefObject<((page: number) => void) | null>;
 }) {
