@@ -364,3 +364,11 @@ export interface DebugEntry {
   message: string;
   context: string | null;
 }
+
+export interface HealthCheck {
+  internet: boolean;
+  mangaCatalog: boolean;
+  /** `null` when no vault is open yet, rather than a false failure. */
+  vaultWritable: boolean | null;
+  checkedAt: number;
+}

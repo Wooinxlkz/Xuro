@@ -2,6 +2,20 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
+## [0.1.5] — September 11, 2026
+
+Bug fixes for Online Manga, and a better Diagnostics panel
+
+### Fixed
+
+- Online Manga: favoriting a manga did nothing if you hadn't already followed it (favorite status lived on the follow record, so the star button silently no-op'd on an unfollowed manga). Favoriting now follows automatically first if needed — it always works with one click.
+- Online Manga: the reader and manga details view could render tiny and cramped instead of full-screen, because they were positioned relative to a nested scrolling container instead of the window. They now always cover the full app window regardless of where they're opened from (Discover, Following, or Downloads).
+
+### Changed
+
+- Settings → Diagnostics: added a "Connection health" check (internet, Online Manga catalog, vault storage) with a one-tap re-check, so a connectivity problem reads as "your network" or "MangaDex is down" instead of looking like an app bug. Also fixed the Copy all/Clear buttons, which had a mismatched background making them look out of place.
+- Online Manga → Following: added a "Mark all as seen" action on the New Chapters group.
+
 ## [0.1.4] — September 11, 2026
 
 Online Manga, and a scroll-through-everything mode for the PDF reader

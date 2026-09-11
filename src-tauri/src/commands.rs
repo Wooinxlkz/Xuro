@@ -954,6 +954,12 @@ pub fn debug_log_clear(app: AppHandle) -> AppResult<()> {
     crate::debug_log::clear(&app)
 }
 
+#[tauri::command]
+pub async fn debug_health_check(state: State<'_, AppState>) -> AppResult<crate::debug_log::HealthCheck> {
+    let vault_root = state.root().ok();
+    Ok(crate::debug_log::run_health_check(vault_root).await)
+}
+
 /// Open a native file picker for a book/manga file to upload. Returns the
 /// picked path as a string for the frontend to pass straight to
 /// `library_upload`; async for the same reason as `choose_vault` — the

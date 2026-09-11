@@ -41,7 +41,7 @@ export function MangaDetailsPanel({ onClose }: { onClose: () => void }) {
 
   if (loading || !details) {
     return (
-      <div className="absolute inset-0 z-40 flex items-center justify-center bg-bg">
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-bg">
         <Loader2 size={18} className="animate-spin text-faint" />
       </div>
     );
@@ -73,7 +73,7 @@ export function MangaDetailsPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="absolute inset-0 z-40 overflow-auto bg-bg">
+    <div className="fixed inset-0 z-40 overflow-auto bg-bg">
       <div className="mx-auto w-full max-w-[820px] px-6 pb-24 pt-6">
         <button
           type="button"
@@ -116,7 +116,7 @@ export function MangaDetailsPanel({ onClose }: { onClose: () => void }) {
               <Button
                 size="icon"
                 variant={favorite ? "secondary" : "ghost"}
-                onClick={() => void toggleFavorite(details.id)}
+                onClick={() => void toggleFavorite(details)}
                 title={favorite ? "Remove from favorites" : "Add to favorites"}
               >
                 <Heart size={14} strokeWidth={2} fill={favorite ? "currentColor" : "none"} />

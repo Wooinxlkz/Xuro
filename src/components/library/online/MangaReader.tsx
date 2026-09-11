@@ -216,7 +216,7 @@ export function MangaReader({
   if (!chapter) return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-bg">
+    <div className="fixed inset-0 z-50 flex flex-col bg-bg">
       <div className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-2">
         <div className="min-w-0">
           <p className="truncate text-[13px] font-medium text-ink">{mangaTitle}</p>

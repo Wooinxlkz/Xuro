@@ -16,6 +16,7 @@ import type {
   DebugEntry,
   DownloadedChapter,
   Graph,
+  HealthCheck,
   LibraryItem,
   LibraryKind,
   LibrarySearchResult,
@@ -297,6 +298,7 @@ export const ipc = {
   ) => call<void>("debug_log_add", { level, source, message, context }),
   debugLogList: () => call<DebugEntry[]>("debug_log_list"),
   debugLogClear: () => call<void>("debug_log_clear"),
+  debugHealthCheck: () => call<HealthCheck>("debug_health_check"),
   libraryPickUploadFile: () => call<string | null>("library_pick_upload_file"),
 
   bookmarksList: () => call<Bookmark[]>("bookmarks_list"),

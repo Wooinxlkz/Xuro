@@ -250,7 +250,20 @@ function FollowingSection() {
         </Button>
       </div>
       {updated.length > 0 && (
-        <FollowGroup title="New chapters" items={updated} onOpen={openManga} />
+        <FollowGroup
+          title="New chapters"
+          items={updated}
+          onOpen={openManga}
+          action={
+            <button
+              type="button"
+              onClick={() => void useOnlineManga.getState().markAllUpdatesSeen()}
+              className="text-[10.5px] font-medium text-faint hover:text-ink"
+            >
+              Mark all as seen
+            </button>
+          }
+        />
       )}
       {favorites.length > 0 && <FollowGroup title="Favorites" items={favorites} onOpen={openManga} />}
       <FollowGroup title="Following" items={rest} onOpen={openManga} />
@@ -262,15 +275,20 @@ function FollowGroup({
   title,
   items,
   onOpen,
+  action,
 }: {
   title: string;
   items: ReturnType<typeof useOnlineManga.getState>["follows"];
   onOpen: (id: string) => void;
+  action?: React.ReactNode;
 }) {
   if (items.length === 0) return null;
   return (
     <div className="mb-5">
-      <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-wide text-faint">{title}</p>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">{title}</p>
+        {action}
+      </div>
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
         {items.map((follow) => (
           <button

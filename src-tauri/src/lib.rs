@@ -230,6 +230,7 @@ pub fn run() {
             commands::debug_log_add,
             commands::debug_log_list,
             commands::debug_log_clear,
+            commands::debug_health_check,
             commands::library_pick_upload_file,
             commands::bookmarks_list,
             commands::bookmark_add,

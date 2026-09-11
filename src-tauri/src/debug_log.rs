@@ -11,7 +11,8 @@
 //! not needing a database just to remember the last few hundred crashes.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -93,6 +94,60 @@ pub fn clear(app: &tauri::AppHandle) -> AppResult<()> {
     save(app, &[])
 }
 
+/// A simple "is something actually wrong, or is it just me" report — the
+/// Diagnostics panel's most common real-world question is "is my internet
+/// down, is MangaDex down, or is Xuro broken", and this answers exactly
+/// that without needing to open a browser or a terminal.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HealthCheck {
+    pub internet: bool,
+    pub manga_catalog: bool,
+    /// `None` when no vault is open yet, rather than a false failure.
+    pub vault_writable: Option<bool>,
+    pub checked_at: i64,
+}
+
+async fn reachable(url: &str) -> bool {
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(Duration::from_secs(6))
+        .user_agent("Xuro/0.1.5")
+        .build()
+    else {
+        return false;
+    };
+    client
+        .get(url)
+        .send()
+        .await
+        .map(|response| response.status().is_success())
+        .unwrap_or(false)
+}
+
+fn vault_write_check(root: &Path) -> bool {
+    let probe = root.join(".xuro").join(".health-check-tmp");
+    if fs::write(&probe, b"ok").is_ok() {
+        let _ = fs::remove_file(&probe);
+        true
+    } else {
+        false
+    }
+}
+
+/// Runs the internet and MangaDex checks one after another — each has its
+/// own short timeout, so a dead endpoint adds at most a few seconds, not a
+/// hang.
+pub async fn run_health_check(vault_root: Option<PathBuf>) -> HealthCheck {
+    let internet = reachable("https://api.github.com").await;
+    let manga_catalog = reachable("https://api.mangadex.org/ping").await;
+    HealthCheck {
+        internet,
+        manga_catalog,
+        vault_writable: vault_root.as_deref().map(vault_write_check),
+        checked_at: now_ms(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,5 +161,13 @@ mod tests {
     #[test]
     fn max_entries_constant_is_sane() {
         assert!(MAX_ENTRIES > 0);
+    }
+
+    #[test]
+    fn vault_write_check_round_trips_and_leaves_no_trace() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".xuro")).unwrap();
+        assert!(vault_write_check(dir.path()));
+        assert!(!dir.path().join(".xuro").join(".health-check-tmp").exists());
     }
 }

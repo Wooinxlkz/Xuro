@@ -401,7 +401,7 @@ pub async fn download_chapter(
 
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
-        .user_agent("Xuro/0.1.4")
+        .user_agent("Xuro/0.1.5")
         .build()
         .map_err(|error| AppError::Network(error.to_string()))?;
 

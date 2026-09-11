@@ -77,7 +77,7 @@ interface OnlineMangaState {
 
   isFollowing: (mangaId: string) => boolean;
   toggleFollow: (manga: MangaSummary | MangaDetails) => Promise<void>;
-  toggleFavorite: (mangaId: string) => Promise<void>;
+  toggleFavorite: (manga: MangaSummary | MangaDetails) => Promise<void>;
   refreshUpdates: () => Promise<void>;
 
   progressFor: (mangaId: string) => MangaReadingProgress | undefined;
@@ -89,6 +89,7 @@ interface OnlineMangaState {
   ) => Promise<void>;
 
   clearHistory: () => Promise<void>;
+  markAllUpdatesSeen: () => Promise<void>;
 
   loadBookmarksFor: (mangaId: string) => Promise<void>;
   addBookmark: (
@@ -247,12 +248,21 @@ export const useOnlineManga = create<OnlineMangaState>((set, get) => ({
     }
   },
 
-  toggleFavorite: async (mangaId) => {
-    const current = get().follows.find((f) => f.mangaId === mangaId);
-    if (!current) return;
+  // Favoriting is meant to work as a one-click "save this" from anywhere,
+  // even for a manga the person hasn't explicitly followed yet — so if
+  // there's no follow entry to flip the flag on, this quietly creates one
+  // first instead of doing nothing (the bug: clicking the star before
+  // following silently no-op'd, because favorite state lived on the
+  // follow record).
+  toggleFavorite: async (manga) => {
     try {
-      const updated = await ipc.mangaSetFavorite(mangaId, !current.isFavorite);
-      set({ follows: get().follows.map((f) => (f.mangaId === mangaId ? updated : f)) });
+      let current = get().follows.find((f) => f.mangaId === manga.id);
+      if (!current) {
+        current = await ipc.mangaFollow(manga.id, manga.title, manga.coverUrl);
+        set({ follows: [current, ...get().follows] });
+      }
+      const updated = await ipc.mangaSetFavorite(manga.id, !current.isFavorite);
+      set({ follows: get().follows.map((f) => (f.mangaId === manga.id ? updated : f)) });
     } catch (err) {
       oops(err);
     }
@@ -307,6 +317,22 @@ export const useOnlineManga = create<OnlineMangaState>((set, get) => ({
     try {
       await ipc.mangaHistoryClear();
       set({ history: [] });
+    } catch (err) {
+      oops(err);
+    }
+  },
+
+  // "Following" groups manga with a new chapter under its own heading —
+  // this clears that whole group in one tap instead of opening each manga
+  // just to dismiss its badge.
+  markAllUpdatesSeen: async () => {
+    const updated = get().follows.filter((f) => f.hasUpdate);
+    if (updated.length === 0) return;
+    try {
+      await Promise.all(updated.map((f) => ipc.mangaMarkSeen(f.mangaId)));
+      set({
+        follows: get().follows.map((f) => (f.hasUpdate ? { ...f, hasUpdate: false } : f)),
+      });
     } catch (err) {
       oops(err);
     }

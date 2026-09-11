@@ -161,7 +161,7 @@ pub struct ChapterPages {
 fn client() -> AppResult<reqwest::Client> {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
-        .user_agent("Xuro/0.1.4")
+        .user_agent("Xuro/0.1.5")
         .build()
         .map_err(|error| AppError::Network(error.to_string()))
 }

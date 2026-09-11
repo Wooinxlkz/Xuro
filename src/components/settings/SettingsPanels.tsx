@@ -1,8 +1,11 @@
 import {
   ArrowDownToLine,
+  CheckCircle2,
   Copy,
   FolderOpen,
   Globe2,
+  HardDrive,
+  Loader2,
   Lock,
   Mail,
   Monitor,
@@ -12,6 +15,7 @@ import {
   ShieldCheck,
   Sun,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
@@ -23,6 +27,7 @@ import type {
   AccentColor,
   BackgroundStyle,
   CloudAccount,
+  HealthCheck,
   ObsidianImportSummary,
   Theme,
 } from "@/lib/types";
@@ -977,12 +982,24 @@ function ReadonlyShortcutRow({
 export function DebugSettings() {
   const [entries, setEntries] = useState<DebugEntry[] | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [health, setHealth] = useState<HealthCheck | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
 
   const load = () => {
     void ipc.debugLogList().then(setEntries).catch(() => setEntries([]));
   };
 
+  const runHealthCheck = () => {
+    setCheckingHealth(true);
+    void ipc
+      .debugHealthCheck()
+      .then(setHealth)
+      .catch((error) => toast.error(error instanceof Error ? error.message : String(error)))
+      .finally(() => setCheckingHealth(false));
+  };
+
   useEffect(load, []);
+  useEffect(runHealthCheck, []);
 
   const clear = async () => {
     setClearing(true);
@@ -1008,16 +1025,71 @@ export function DebugSettings() {
   return (
     <div className="space-y-6">
       <SettingsGroup
+        title="Connection health"
+        description="A quick check for the most common causes of 'Xuro seems broken' — your internet, the Online Manga catalog, and whether your vault folder can still be written to."
+        aside={
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={checkingHealth}
+            onClick={runHealthCheck}
+          >
+            <RefreshCw size={12.5} strokeWidth={1.75} />
+            Run check
+          </Button>
+        }
+      >
+        <div className="overflow-hidden rounded-xl border border-line-soft bg-panel">
+          <HealthRow
+            label="Internet connection"
+            detail="Reaching the open internet at all"
+            checking={checkingHealth}
+            ok={health?.internet ?? null}
+            icon={Globe2}
+          />
+          <HealthRow
+            label="Online Manga catalog"
+            detail="MangaDex — powers browsing, following, and reading online manga"
+            checking={checkingHealth}
+            ok={health?.mangaCatalog ?? null}
+            icon={ShieldCheck}
+          />
+          <HealthRow
+            label="Vault storage"
+            detail={
+              health?.vaultWritable === null
+                ? "No vault is open right now"
+                : "Your vault folder can be written to"
+            }
+            checking={checkingHealth}
+            ok={health?.vaultWritable ?? null}
+            icon={HardDrive}
+            last
+          />
+        </div>
+        {health && (
+          <p className="mt-2 text-[10.5px] text-faint">
+            Last checked {new Date(health.checkedAt).toLocaleTimeString()}
+            {!health.internet &&
+              " — if this is the only thing failing, it's almost certainly your network or a firewall, not Xuro."}
+            {health.internet &&
+              !health.mangaCatalog &&
+              " — your internet's fine, but MangaDex isn't reachable right now (it may be down, or blocked by a firewall/VPN)."}
+          </p>
+        )}
+      </SettingsGroup>
+
+      <SettingsGroup
         title="Diagnostics"
         description="Unexpected errors Xuro has run into, kept locally with a timestamp — nothing here is sent anywhere."
         aside={
           entries && entries.length > 0 ? (
             <div className="flex gap-1.5">
-              <Button variant="outline" size="sm" onClick={copyAll} className="bg-bg">
+              <Button variant="secondary" size="sm" onClick={copyAll}>
                 <Copy size={12.5} strokeWidth={1.75} />
                 Copy all
               </Button>
-              <Button variant="outline" size="sm" loading={clearing} onClick={() => void clear()} className="bg-bg">
+              <Button variant="secondary" size="sm" loading={clearing} onClick={() => void clear()}>
                 <Trash2 size={12.5} strokeWidth={1.75} />
                 Clear
               </Button>
@@ -1067,6 +1139,45 @@ export function DebugSettings() {
           </div>
         )}
       </SettingsGroup>
+    </div>
+  );
+}
+
+function HealthRow({
+  label,
+  detail,
+  checking,
+  ok,
+  icon: Icon,
+  last = false,
+}: {
+  label: string;
+  detail: string;
+  checking: boolean;
+  ok: boolean | null;
+  icon: typeof Globe2;
+  last?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 px-3.5 py-2.5 ${last ? "" : "border-b border-line-soft"}`}
+    >
+      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-sunken text-faint">
+        <Icon size={14} strokeWidth={1.75} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[12.5px] font-medium text-ink">{label}</p>
+        <p className="truncate text-[11px] text-faint">{detail}</p>
+      </div>
+      {checking ? (
+        <Loader2 size={15} className="shrink-0 animate-spin text-faint" />
+      ) : ok === null ? (
+        <span className="shrink-0 text-[11px] text-faint">—</span>
+      ) : ok ? (
+        <CheckCircle2 size={16} strokeWidth={1.75} className="shrink-0 text-success" />
+      ) : (
+        <XCircle size={16} strokeWidth={1.75} className="shrink-0 text-danger" />
+      )}
     </div>
   );
 }
