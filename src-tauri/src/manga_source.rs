@@ -417,8 +417,10 @@ pub async fn browse(params: MangaBrowseParams) -> AppResult<MangaPage> {
         .map(RawManga::to_summary)
         .collect();
 
+    let has_more = (offset as i64) + (items.len() as i64) < parsed.total;
+
     Ok(MangaPage {
-        has_more: offset as i64 + items.len() as i64 < parsed.total,
+        has_more,
         items,
         total: parsed.total,
         page: params.page,
