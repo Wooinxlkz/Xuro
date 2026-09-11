@@ -20,6 +20,9 @@ import type { LibraryItem, LibraryKind, LibrarySearchResult } from "@/lib/types"
 import { useLibrary, type LibraryViewMode } from "@/stores/library";
 import { useVault } from "@/stores/vault";
 import { PdfReader } from "./PdfReader";
+import { OnlineMangaHub } from "./online/OnlineMangaHub";
+
+type MangaSubTab = "mine" | "online";
 
 const VIEW_MODES: Array<{ mode: LibraryViewMode; icon: typeof List; label: string }> = [
   { mode: "list", icon: List, label: "List" },
@@ -43,6 +46,11 @@ export function LibraryPage() {
   const [query, setQuery] = useState("");
   const [readingItem, setReadingItem] = useState<LibraryItem | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Only ever relevant while searchKind === "manga" — Books keeps its
+  // original single-view layout untouched. Defaults to "mine" so nothing
+  // about the existing Manga experience changes until the person actively
+  // opts into Online.
+  const [mangaSubTab, setMangaSubTab] = useState<MangaSubTab>("mine");
 
   useEffect(() => {
     load();
@@ -146,51 +154,82 @@ export function LibraryPage() {
           </Button>
         </div>
 
-        {query.trim().length > 0 && (
-          <>
-            <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-faint">
-              Add from catalog
-            </p>
-            <SearchResults
-              results={searchResults}
-              searching={searching}
-              onAdd={addFromSearch}
-              alreadySaved={alreadySaved}
-            />
-          </>
+        {/* Manga-only: Online Manga is a clearly separate mode from the
+            existing local library above — Books never sees this toggle,
+            and picking "My Library" here reproduces the exact original
+            Manga experience untouched. */}
+        {searchKind === "manga" && (
+          <div className="mb-3 flex items-center gap-1 rounded-lg border border-line-soft bg-panel p-0.5">
+            {([
+              { key: "mine", label: "My Library" },
+              { key: "online", label: "Online Manga" },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setMangaSubTab(key)}
+                className={cx(
+                  "rounded-md px-2.5 py-1 text-[12px] transition-colors duration-100",
+                  mangaSubTab === key ? "bg-active text-ink font-medium" : "text-faint hover:text-ink",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         )}
 
-        <div className="mt-5">
-          <div className="mb-2.5 flex items-center gap-2">
-            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">
-              Your library
-            </p>
+        {searchKind === "manga" && mangaSubTab === "online" ? (
+          <OnlineMangaHub />
+        ) : (
+          <>
             {query.trim().length > 0 && (
-              <p className="text-[10.5px] text-faint">
-                {libraryMatches.length} matching "{query.trim()}"
-              </p>
+              <>
+                <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-faint">
+                  Add from catalog
+                </p>
+                <SearchResults
+                  results={searchResults}
+                  searching={searching}
+                  onAdd={addFromSearch}
+                  alreadySaved={alreadySaved}
+                />
+              </>
             )}
-          </div>
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-              <BookOpen size={22} strokeWidth={1.5} className="text-faint" />
-              <p className="text-[13px] text-muted">Your library is empty</p>
-              <p className="max-w-[280px] text-[11.5px] text-faint">
-                Search above to add a book or manga, or upload a file of your own.
-              </p>
+
+            <div className="mt-5">
+              <div className="mb-2.5 flex items-center gap-2">
+                <p className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">
+                  Your library
+                </p>
+                {query.trim().length > 0 && (
+                  <p className="text-[10.5px] text-faint">
+                    {libraryMatches.length} matching "{query.trim()}"
+                  </p>
+                )}
+              </div>
+              {items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                  <BookOpen size={22} strokeWidth={1.5} className="text-faint" />
+                  <p className="text-[13px] text-muted">Your library is empty</p>
+                  <p className="max-w-[280px] text-[11.5px] text-faint">
+                    Search above to add a book or manga, or upload a file of your own.
+                  </p>
+                </div>
+              ) : libraryMatches.length === 0 ? (
+                <p className="py-10 text-center text-[12px] text-faint">
+                  Nothing in your library matches "{query.trim()}" — try "Add from catalog" above.
+                </p>
+              ) : viewMode === "list" ? (
+                <ListView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
+              ) : viewMode === "grid" ? (
+                <GridView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
+              ) : (
+                <BentoView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
+              )}
             </div>
-          ) : libraryMatches.length === 0 ? (
-            <p className="py-10 text-center text-[12px] text-faint">
-              Nothing in your library matches "{query.trim()}" — try "Add from catalog" above.
-            </p>
-          ) : viewMode === "list" ? (
-            <ListView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
-          ) : viewMode === "grid" ? (
-            <GridView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
-          ) : (
-            <BentoView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
-          )}
-        </div>
+          </>
+        )}
       </div>
 
       {pickedFile && <UploadDialog defaultKind={searchKind} />}

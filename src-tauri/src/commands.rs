@@ -11,6 +11,10 @@ use crate::boards::{self, Board};
 use crate::config::{self, AccentColor, BackgroundStyle, Theme};
 use crate::error::{AppError, AppResult};
 use crate::library::{self, LibraryItem, LibrarySearchResult};
+use crate::manga_online::{
+    self, DownloadedChapter, HistoryEntry, MangaBookmarkEntry, MangaFollow, ReadingProgress,
+};
+use crate::manga_source::{self, MangaBrowseParams, MangaChapter, MangaDetails, MangaPage, MangaTag};
 use crate::search::SearchHit;
 use crate::todos::{self, Todo};
 use crate::vault::{self, TreeNode};
@@ -721,6 +725,210 @@ pub fn library_set_last_page(
 #[tauri::command]
 pub fn library_read_file(state: State<'_, AppState>, id: String) -> AppResult<String> {
     library::read_file_base64(&state.root()?, &id)
+}
+
+// ---- online manga: catalog (network only, no vault state needed) ----
+
+#[tauri::command]
+pub async fn manga_online_browse(params: MangaBrowseParams) -> AppResult<MangaPage> {
+    manga_source::browse(params).await
+}
+
+#[tauri::command]
+pub async fn manga_online_details(manga_id: String) -> AppResult<MangaDetails> {
+    manga_source::details(&manga_id).await
+}
+
+#[tauri::command]
+pub async fn manga_online_chapters(
+    manga_id: String,
+    language: Option<manga_source::MangaLanguage>,
+    page: u32,
+) -> AppResult<Vec<MangaChapter>> {
+    manga_source::chapters(&manga_id, language, page).await
+}
+
+#[tauri::command]
+pub async fn manga_online_chapter_pages(chapter_id: String) -> AppResult<manga_source::ChapterPages> {
+    manga_source::chapter_pages(&chapter_id).await
+}
+
+#[tauri::command]
+pub async fn manga_online_genres() -> AppResult<Vec<MangaTag>> {
+    manga_source::genres().await
+}
+
+// ---- online manga: follows, progress, history, bookmarks, downloads ----
+
+#[tauri::command]
+pub fn manga_follows_list(state: State<'_, AppState>) -> AppResult<Vec<MangaFollow>> {
+    manga_online::list_follows(&state.root()?)
+}
+
+#[tauri::command]
+pub async fn manga_follow(
+    state: State<'_, AppState>,
+    manga_id: String,
+    title: String,
+    cover_url: Option<String>,
+) -> AppResult<MangaFollow> {
+    let root = state.root()?;
+    manga_online::follow(&root, &manga_id, &title, cover_url).await
+}
+
+#[tauri::command]
+pub fn manga_unfollow(state: State<'_, AppState>, manga_id: String) -> AppResult<()> {
+    manga_online::unfollow(&state.root()?, &manga_id)
+}
+
+#[tauri::command]
+pub fn manga_set_favorite(
+    state: State<'_, AppState>,
+    manga_id: String,
+    favorite: bool,
+) -> AppResult<MangaFollow> {
+    manga_online::set_favorite(&state.root()?, &manga_id, favorite)
+}
+
+#[tauri::command]
+pub fn manga_mark_seen(state: State<'_, AppState>, manga_id: String) -> AppResult<()> {
+    manga_online::mark_seen(&state.root()?, &manga_id)
+}
+
+#[tauri::command]
+pub async fn manga_check_updates(state: State<'_, AppState>) -> AppResult<Vec<MangaFollow>> {
+    let root = state.root()?;
+    manga_online::check_updates(&root).await
+}
+
+#[tauri::command]
+pub fn manga_progress_list(state: State<'_, AppState>) -> AppResult<Vec<ReadingProgress>> {
+    manga_online::list_progress(&state.root()?)
+}
+
+#[tauri::command]
+pub fn manga_progress_get(
+    state: State<'_, AppState>,
+    manga_id: String,
+) -> AppResult<Option<ReadingProgress>> {
+    manga_online::get_progress(&state.root()?, &manga_id)
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn manga_progress_set(
+    state: State<'_, AppState>,
+    manga_id: String,
+    manga_title: String,
+    cover_url: Option<String>,
+    chapter_id: String,
+    chapter_label: String,
+    page: u32,
+    page_count: u32,
+) -> AppResult<ReadingProgress> {
+    manga_online::set_progress(
+        &state.root()?,
+        &manga_id,
+        &manga_title,
+        cover_url,
+        &chapter_id,
+        &chapter_label,
+        page,
+        page_count,
+    )
+}
+
+#[tauri::command]
+pub fn manga_history_list(state: State<'_, AppState>) -> AppResult<Vec<HistoryEntry>> {
+    manga_online::list_history(&state.root()?)
+}
+
+#[tauri::command]
+pub fn manga_history_clear(state: State<'_, AppState>) -> AppResult<()> {
+    manga_online::clear_history(&state.root()?)
+}
+
+#[tauri::command]
+pub fn manga_bookmarks_list(
+    state: State<'_, AppState>,
+    manga_id: Option<String>,
+) -> AppResult<Vec<MangaBookmarkEntry>> {
+    manga_online::list_bookmarks(&state.root()?, manga_id.as_deref())
+}
+
+#[tauri::command]
+pub fn manga_bookmark_add(
+    state: State<'_, AppState>,
+    manga_id: String,
+    manga_title: String,
+    chapter_id: String,
+    chapter_label: String,
+    page: u32,
+) -> AppResult<MangaBookmarkEntry> {
+    manga_online::add_bookmark(
+        &state.root()?,
+        &manga_id,
+        &manga_title,
+        &chapter_id,
+        &chapter_label,
+        page,
+    )
+}
+
+#[tauri::command]
+pub fn manga_bookmark_remove(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    manga_online::remove_bookmark(&state.root()?, &id)
+}
+
+#[tauri::command]
+pub fn manga_downloads_list(
+    state: State<'_, AppState>,
+    manga_id: Option<String>,
+) -> AppResult<Vec<DownloadedChapter>> {
+    manga_online::list_downloads(&state.root()?, manga_id.as_deref())
+}
+
+#[tauri::command]
+pub fn manga_is_downloaded(state: State<'_, AppState>, chapter_id: String) -> AppResult<bool> {
+    manga_online::is_downloaded(&state.root()?, &chapter_id)
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn manga_download_chapter(
+    state: State<'_, AppState>,
+    manga_id: String,
+    manga_title: String,
+    cover_url: Option<String>,
+    chapter_id: String,
+    chapter_label: String,
+    language: String,
+) -> AppResult<DownloadedChapter> {
+    let root = state.root()?;
+    manga_online::download_chapter(
+        &root,
+        &manga_id,
+        &manga_title,
+        cover_url,
+        &chapter_id,
+        &chapter_label,
+        &language,
+    )
+    .await
+}
+
+#[tauri::command]
+pub fn manga_download_remove(state: State<'_, AppState>, chapter_id: String) -> AppResult<()> {
+    manga_online::remove_download(&state.root()?, &chapter_id)
+}
+
+#[tauri::command]
+pub fn manga_download_read_page(
+    state: State<'_, AppState>,
+    chapter_id: String,
+    page_index: usize,
+) -> AppResult<String> {
+    manga_online::read_downloaded_page(&state.root()?, &chapter_id, page_index)
 }
 
 // ---- debug log ----

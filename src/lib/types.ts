@@ -228,6 +228,131 @@ export interface LibrarySearchResult {
   year: number | null;
 }
 
+// ---- Online Manga ----
+
+export type MangaLanguage = "english" | "spanish" | "arabic" | "japanese";
+
+export const MANGA_LANGUAGES: { value: MangaLanguage; label: string }[] = [
+  { value: "english", label: "English" },
+  { value: "spanish", label: "Spanish" },
+  { value: "arabic", label: "Arabic" },
+  { value: "japanese", label: "Japanese" },
+];
+
+export type MangaSort = "latest" | "popular" | "newest" | "titleAsc" | "rating";
+
+export type MangaStatus = "ongoing" | "completed" | "hiatus" | "cancelled";
+
+export interface MangaTag {
+  id: string;
+  name: string;
+  group: string;
+}
+
+export interface MangaSummary {
+  id: string;
+  title: string;
+  coverUrl: string | null;
+  status: string | null;
+  year: number | null;
+  contentRating: string;
+  tags: string[];
+  demographic: string | null;
+  availableLanguages: string[];
+  lastChapter: string | null;
+}
+
+export interface MangaPageResult {
+  items: MangaSummary[];
+  total: number;
+  page: number;
+  hasMore: boolean;
+}
+
+export interface MangaDetails extends MangaSummary {
+  description: string | null;
+  authors: string[];
+  altTitles: string[];
+}
+
+export interface MangaChapter {
+  id: string;
+  chapter: string | null;
+  title: string | null;
+  translatedLanguage: string;
+  pages: number;
+  publishAt: string | null;
+  scanlationGroup: string | null;
+  external: boolean;
+}
+
+export interface ChapterPages {
+  chapterId: string;
+  imageUrls: string[];
+}
+
+export interface MangaBrowseParams {
+  query?: string;
+  language?: MangaLanguage;
+  genreIds?: string[];
+  status?: MangaStatus | string;
+  sort?: MangaSort;
+  page?: number;
+}
+
+export interface MangaFollow {
+  mangaId: string;
+  title: string;
+  coverUrl: string | null;
+  followedAt: number;
+  isFavorite: boolean;
+  lastKnownChapterId: string | null;
+  lastKnownChapterLabel: string | null;
+  hasUpdate: boolean;
+}
+
+export interface MangaReadingProgress {
+  mangaId: string;
+  mangaTitle: string;
+  coverUrl: string | null;
+  chapterId: string;
+  chapterLabel: string;
+  page: number;
+  pageCount: number;
+  updatedAt: number;
+}
+
+export interface MangaHistoryEntry {
+  mangaId: string;
+  mangaTitle: string;
+  coverUrl: string | null;
+  chapterId: string;
+  chapterLabel: string;
+  readAt: number;
+}
+
+export interface MangaBookmarkEntry {
+  id: string;
+  mangaId: string;
+  mangaTitle: string;
+  chapterId: string;
+  chapterLabel: string;
+  page: number;
+  createdAt: number;
+}
+
+export interface DownloadedChapter {
+  mangaId: string;
+  mangaTitle: string;
+  coverUrl: string | null;
+  chapterId: string;
+  chapterLabel: string;
+  language: string;
+  folderRel: string;
+  pageFiles: string[];
+  downloadedAt: number;
+}
+
 export type DebugLevel = "error" | "warn" | "panic";
 export type DebugSource = "frontend" | "backend";
 

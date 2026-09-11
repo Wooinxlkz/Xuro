@@ -12,11 +12,23 @@ import type {
   PublishedShare,
   OtpChallenge,
   ObsidianImportSummary,
+  ChapterPages,
   DebugEntry,
+  DownloadedChapter,
   Graph,
   LibraryItem,
   LibraryKind,
   LibrarySearchResult,
+  MangaBookmarkEntry,
+  MangaBrowseParams,
+  MangaChapter,
+  MangaDetails,
+  MangaFollow,
+  MangaHistoryEntry,
+  MangaLanguage,
+  MangaPageResult,
+  MangaReadingProgress,
+  MangaTag,
   SearchHit,
   Snippet,
   TagEntry,
@@ -187,6 +199,95 @@ export const ipc = {
   librarySetLastPage: (id: string, page: number) =>
     call<LibraryItem>("library_set_last_page", { id, page }),
   libraryReadFile: (id: string) => call<string>("library_read_file", { id }),
+
+  // ---- Online Manga: catalog ----
+  mangaOnlineBrowse: (params: MangaBrowseParams) =>
+    call<MangaPageResult>("manga_online_browse", { params }),
+  mangaOnlineDetails: (mangaId: string) =>
+    call<MangaDetails>("manga_online_details", { mangaId }),
+  mangaOnlineChapters: (mangaId: string, language: MangaLanguage | undefined, page: number) =>
+    call<MangaChapter[]>("manga_online_chapters", { mangaId, language, page }),
+  mangaOnlineChapterPages: (chapterId: string) =>
+    call<ChapterPages>("manga_online_chapter_pages", { chapterId }),
+  mangaOnlineGenres: () => call<MangaTag[]>("manga_online_genres"),
+
+  // ---- Online Manga: follows, progress, history, bookmarks, downloads ----
+  mangaFollowsList: () => call<MangaFollow[]>("manga_follows_list"),
+  mangaFollow: (mangaId: string, title: string, coverUrl: string | null) =>
+    call<MangaFollow>("manga_follow", { mangaId, title, coverUrl }),
+  mangaUnfollow: (mangaId: string) => call<void>("manga_unfollow", { mangaId }),
+  mangaSetFavorite: (mangaId: string, favorite: boolean) =>
+    call<MangaFollow>("manga_set_favorite", { mangaId, favorite }),
+  mangaMarkSeen: (mangaId: string) => call<void>("manga_mark_seen", { mangaId }),
+  mangaCheckUpdates: () => call<MangaFollow[]>("manga_check_updates"),
+
+  mangaProgressList: () => call<MangaReadingProgress[]>("manga_progress_list"),
+  mangaProgressGet: (mangaId: string) =>
+    call<MangaReadingProgress | null>("manga_progress_get", { mangaId }),
+  mangaProgressSet: (
+    mangaId: string,
+    mangaTitle: string,
+    coverUrl: string | null,
+    chapterId: string,
+    chapterLabel: string,
+    page: number,
+    pageCount: number,
+  ) =>
+    call<MangaReadingProgress>("manga_progress_set", {
+      mangaId,
+      mangaTitle,
+      coverUrl,
+      chapterId,
+      chapterLabel,
+      page,
+      pageCount,
+    }),
+
+  mangaHistoryList: () => call<MangaHistoryEntry[]>("manga_history_list"),
+  mangaHistoryClear: () => call<void>("manga_history_clear"),
+
+  mangaBookmarksList: (mangaId?: string) =>
+    call<MangaBookmarkEntry[]>("manga_bookmarks_list", { mangaId }),
+  mangaBookmarkAdd: (
+    mangaId: string,
+    mangaTitle: string,
+    chapterId: string,
+    chapterLabel: string,
+    page: number,
+  ) =>
+    call<MangaBookmarkEntry>("manga_bookmark_add", {
+      mangaId,
+      mangaTitle,
+      chapterId,
+      chapterLabel,
+      page,
+    }),
+  mangaBookmarkRemove: (id: string) => call<void>("manga_bookmark_remove", { id }),
+
+  mangaDownloadsList: (mangaId?: string) =>
+    call<DownloadedChapter[]>("manga_downloads_list", { mangaId }),
+  mangaIsDownloaded: (chapterId: string) =>
+    call<boolean>("manga_is_downloaded", { chapterId }),
+  mangaDownloadChapter: (
+    mangaId: string,
+    mangaTitle: string,
+    coverUrl: string | null,
+    chapterId: string,
+    chapterLabel: string,
+    language: string,
+  ) =>
+    call<DownloadedChapter>("manga_download_chapter", {
+      mangaId,
+      mangaTitle,
+      coverUrl,
+      chapterId,
+      chapterLabel,
+      language,
+    }),
+  mangaDownloadRemove: (chapterId: string) =>
+    call<void>("manga_download_remove", { chapterId }),
+  mangaDownloadReadPage: (chapterId: string, pageIndex: number) =>
+    call<string>("manga_download_read_page", { chapterId, pageIndex }),
 
   debugLogAdd: (
     level: "error" | "warn" | "panic",

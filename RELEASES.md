@@ -2,6 +2,19 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
+## [0.1.4] — September 11, 2026
+
+Online Manga, and a scroll-through-everything mode for the PDF reader
+
+### Features
+
+- **Online Manga** (Manga tab only — Books is untouched): a whole new mode alongside your existing local Manga Library, clearly separated from it. Automatically browse a large, constantly-updating catalog of old and new manga with latest-chapter updates, filterable by language (English, Spanish, Arabic, Japanese), genres/categories, status, and popularity, with search and sorting — explicit/adult content is excluded both by API request and by a local safety filter. Open and read chapters right in Xuro; follow manga to get a "new chapter" indicator without an account; keep reading history and favorites; resume exactly where you left off with per-manga progress and bookmarks; and download chapters for fully offline reading, stored inside your vault's existing Library folder (`Library/OnlineManga/…`) but never mixed into "Your library".
+- PDF reader: a new toolbar toggle between "page by page" (the original single-page view, click or arrow-key through) and "all pages" — every page loads into one continuous, scrollable column, rendering lazily as you approach each page so even long PDFs stay smooth.
+
+### Changed
+
+- AGENTS.md: documented the two new backend modules (`manga_source.rs`, `manga_online.rs`) and the new frontend `onlineManga` store / `library/online/` components.
+
 ## [0.1.3] — September 10, 2026
 
 A real fix for the native context menu, a richer reader, and a debug log

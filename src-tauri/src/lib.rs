@@ -18,6 +18,8 @@ mod link_meta;
 mod linux_webkit;
 mod library;
 mod locks;
+mod manga_online;
+mod manga_source;
 mod notes;
 mod obsidian_import;
 mod pins;
@@ -201,6 +203,30 @@ pub fn run() {
             commands::library_attach_file,
             commands::library_set_last_page,
             commands::library_read_file,
+            commands::manga_online_browse,
+            commands::manga_online_details,
+            commands::manga_online_chapters,
+            commands::manga_online_chapter_pages,
+            commands::manga_online_genres,
+            commands::manga_follows_list,
+            commands::manga_follow,
+            commands::manga_unfollow,
+            commands::manga_set_favorite,
+            commands::manga_mark_seen,
+            commands::manga_check_updates,
+            commands::manga_progress_list,
+            commands::manga_progress_get,
+            commands::manga_progress_set,
+            commands::manga_history_list,
+            commands::manga_history_clear,
+            commands::manga_bookmarks_list,
+            commands::manga_bookmark_add,
+            commands::manga_bookmark_remove,
+            commands::manga_downloads_list,
+            commands::manga_is_downloaded,
+            commands::manga_download_chapter,
+            commands::manga_download_remove,
+            commands::manga_download_read_page,
             commands::debug_log_add,
             commands::debug_log_list,
             commands::debug_log_clear,

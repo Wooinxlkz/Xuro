@@ -7,14 +7,18 @@ import {
   Maximize2,
   Minimize2,
   MoveHorizontal,
+  Rows3,
+  SquareStack,
   X,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import { ipc } from "@/lib/ipc";
 import type { LibraryItem } from "@/lib/types";
 import { useVault } from "@/stores/vault";
+
+type ReadMode = "page" | "scroll";
 
 function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64);
@@ -38,6 +42,7 @@ export function PdfReader({ item, onClose }: { item: LibraryItem; onClose: () =>
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const docRef = useRef<import("pdfjs-dist").PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
+  const scrollToPageRef = useRef<((page: number) => void) | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +52,11 @@ export function PdfReader({ item, onClose }: { item: LibraryItem; onClose: () =>
   const [zoom, setZoom] = useState(1.1);
   const [fitWidth, setFitWidth] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
+  // Page by page (click/arrow through one page at a time, the original
+  // behavior) or All pages (every page loads into one continuous, scrollable
+  // column) — a reading-style toggle, defaulting to the original page mode
+  // so nothing changes unless the person picks "all pages" themselves.
+  const [mode, setMode] = useState<ReadMode>("page");
 
   // Loads the document itself — runs once per item (this component is
   // mounted with `key={item.id}` by LibraryPage, so a different item is
@@ -92,10 +102,12 @@ export function PdfReader({ item, onClose }: { item: LibraryItem; onClose: () =>
   // Renders the current page at the current zoom. `fitWidth` recomputes an
   // effective zoom from the scroll container's actual width first, so the
   // page always fills it regardless of the PDF's native page size.
+  // Only runs in "page" mode — in "scroll" mode, AllPagesView below owns
+  // rendering instead, so this leaves the canvas alone.
   useEffect(() => {
     const doc = docRef.current;
     const canvas = canvasRef.current;
-    if (!doc || !canvas || loading) return;
+    if (mode !== "page" || !doc || !canvas || loading) return;
 
     let cancelled = false;
     void (async () => {
@@ -133,12 +145,42 @@ export function PdfReader({ item, onClose }: { item: LibraryItem; onClose: () =>
     return () => {
       cancelled = true;
     };
-  }, [page, zoom, fitWidth, loading, item.id]);
+  }, [page, zoom, fitWidth, loading, item.id, mode]);
 
   const goTo = useCallback(
-    (next: number) => setPage(Math.min(Math.max(next, 1), pageCount || 1)),
-    [pageCount],
+    (next: number) => {
+      const clamped = Math.min(Math.max(next, 1), pageCount || 1);
+      setPage(clamped);
+      if (mode === "scroll") scrollToPageRef.current?.(clamped);
+    },
+    [pageCount, mode],
   );
+
+  // In scroll mode the "current page" is whatever's most visible, tracked
+  // by AllPagesView — persisted the same way the page-mode effect above
+  // does, just throttled here instead since scroll fires far more often.
+  const lastPersistRef = useRef(0);
+  const onVisiblePage = useCallback(
+    (num: number) => {
+      setPage(num);
+      const now = Date.now();
+      if (now - lastPersistRef.current > 600) {
+        lastPersistRef.current = now;
+        void ipc.librarySetLastPage(item.id, num).catch(() => {
+          /* best-effort */
+        });
+      }
+    },
+    [item.id],
+  );
+
+  // Switching into "all pages" mode should land on whichever page was
+  // being read in page-by-page mode (including the very first page
+  // resumed from last time), not reset to the top of the document.
+  useEffect(() => {
+    if (mode === "scroll") scrollToPageRef.current?.(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const zoomBy = (delta: number) => {
     setFitWidth(false);
@@ -274,6 +316,27 @@ export function PdfReader({ item, onClose }: { item: LibraryItem; onClose: () =>
               <div className="mx-1 h-4 w-px bg-line-soft" />
               <button
                 type="button"
+                onClick={() => setMode("page")}
+                title="Page by page — click the sides or use arrow keys"
+                className={`grid h-7 w-7 place-items-center rounded-md transition-colors duration-100 ${
+                  mode === "page" ? "bg-active text-ink" : "text-faint hover:bg-hover hover:text-ink"
+                }`}
+              >
+                <SquareStack size={14} strokeWidth={1.8} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("scroll")}
+                title="All pages — load every page and scroll through them"
+                className={`grid h-7 w-7 place-items-center rounded-md transition-colors duration-100 ${
+                  mode === "scroll" ? "bg-active text-ink" : "text-faint hover:bg-hover hover:text-ink"
+                }`}
+              >
+                <Rows3 size={14} strokeWidth={1.8} />
+              </button>
+              <div className="mx-1 h-4 w-px bg-line-soft" />
+              <button
+                type="button"
                 onClick={toggleFullscreen}
                 title={fullscreen ? "Exit fullscreen" : "Fullscreen"}
                 className="grid h-7 w-7 place-items-center rounded-md text-faint transition-colors duration-100 hover:bg-hover hover:text-ink"
@@ -329,10 +392,147 @@ export function PdfReader({ item, onClose }: { item: LibraryItem; onClose: () =>
             </button>
           </div>
         )}
-        {!loading && !error && (
+        {!loading && !error && mode === "page" && (
           <canvas ref={canvasRef} className="rounded-sm shadow-md shadow-black/10" />
         )}
+        {!loading && !error && mode === "scroll" && docRef.current && (
+          <AllPagesView
+            doc={docRef.current}
+            pageCount={pageCount}
+            zoom={zoom}
+            fitWidth={fitWidth}
+            containerRef={scrollRef}
+            onVisiblePage={onVisiblePage}
+            scrollToPageRef={scrollToPageRef}
+            key={item.id}
+          />
+        )}
       </div>
+    </div>
+  );
+}
+
+/** "All pages" mode: every page gets its own container in one continuous,
+ * scrollable column. Pages render lazily as they approach the viewport
+ * (a generous `rootMargin` below) rather than all at once up front, which
+ * keeps a 500-page scan from stalling the reader on open — but a page
+ * never un-renders once drawn, so once scrolled past, it stays put. */
+function AllPagesView({
+  doc,
+  pageCount,
+  zoom,
+  fitWidth,
+  containerRef,
+  onVisiblePage,
+  scrollToPageRef,
+}: {
+  doc: import("pdfjs-dist").PDFDocumentProxy;
+  pageCount: number;
+  zoom: number;
+  fitWidth: boolean;
+  containerRef: RefObject<HTMLDivElement>;
+  onVisiblePage: (page: number) => void;
+  scrollToPageRef: MutableRefObject<((page: number) => void) | null>;
+}) {
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const renderedAtZoom = useRef<Map<number, number>>(new Map());
+
+  const renderPage = useCallback(
+    async (num: number) => {
+      const container = pageRefs.current.get(num);
+      if (!container) return;
+      if (renderedAtZoom.current.get(num) === zoom) return; // already current
+      try {
+        const pdfPage = await doc.getPage(num);
+        let effectiveZoom = zoom;
+        if (fitWidth && containerRef.current) {
+          const naturalWidth = pdfPage.getViewport({ scale: 1 }).width;
+          const available = containerRef.current.clientWidth - 48;
+          if (naturalWidth > 0 && available > 0) effectiveZoom = available / naturalWidth;
+        }
+        const viewport = pdfPage.getViewport({ scale: effectiveZoom });
+        let canvas = container.querySelector("canvas");
+        if (!canvas) {
+          canvas = document.createElement("canvas");
+          container.appendChild(canvas);
+        }
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        renderedAtZoom.current.set(num, zoom);
+        await pdfPage.render({ canvasContext: context, viewport }).promise;
+      } catch {
+        renderedAtZoom.current.delete(num);
+      }
+    },
+    [doc, zoom, fitWidth, containerRef],
+  );
+
+  // Renders pages as they scroll near, and keeps the toolbar's page
+  // indicator + last-read persistence in sync with whichever page is
+  // actually in view.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const renderObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const num = Number((entry.target as HTMLElement).dataset.page);
+            void renderPage(num);
+          }
+        }
+      },
+      { root: container, rootMargin: "1200px 0px", threshold: 0 },
+    );
+    for (const el of pageRefs.current.values()) renderObserver.observe(el);
+
+    const onScroll = () => {
+      const top = container.getBoundingClientRect().top + 100;
+      let closest = 1;
+      let closestDistance = Infinity;
+      for (const [num, el] of pageRefs.current) {
+        const distance = Math.abs(el.getBoundingClientRect().top - top);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closest = num;
+        }
+      }
+      onVisiblePage(closest);
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      renderObserver.disconnect();
+      container.removeEventListener("scroll", onScroll);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageCount, renderPage]);
+
+  useEffect(() => {
+    scrollToPageRef.current = (num) => {
+      pageRefs.current.get(num)?.scrollIntoView({ block: "start" });
+    };
+    return () => {
+      scrollToPageRef.current = null;
+    };
+  }, [scrollToPageRef]);
+
+  return (
+    <div className="flex w-full max-w-full flex-col items-center gap-3">
+      {Array.from({ length: pageCount }, (_, i) => i + 1).map((num) => (
+        <div
+          key={num}
+          data-page={num}
+          ref={(el) => {
+            if (el) pageRefs.current.set(num, el);
+            else pageRefs.current.delete(num);
+          }}
+          className="flex min-h-[200px] items-center justify-center [&>canvas]:rounded-sm [&>canvas]:shadow-md [&>canvas]:shadow-black/10"
+        />
+      ))}
     </div>
   );
 }
