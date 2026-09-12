@@ -7,6 +7,7 @@ import {
   Code2,
   Command,
   FilePlus,
+  Feather,
   FolderPlus,
   Hash,
   Kanban,
@@ -136,6 +137,12 @@ export function Sidebar() {
           icon={<Library size={15} strokeWidth={1.75} />}
           label="Library"
           onClick={() => setView({ type: "library" })}
+        />
+        <PageLink
+          active={view?.type === "studio"}
+          icon={<Feather size={15} strokeWidth={1.75} />}
+          label="Inkwell"
+          onClick={() => setView({ type: "studio" })}
         />
       </nav>
 

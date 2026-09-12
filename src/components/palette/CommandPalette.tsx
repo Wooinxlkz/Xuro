@@ -202,6 +202,12 @@ export function CommandPalette() {
         run: () => vault.setView({ type: "library" }),
       },
       {
+        id: "studio",
+        label: "Open Inkwell",
+        icon: Feather,
+        run: () => vault.setView({ type: "studio" }),
+      },
+      {
         id: "zen-mode",
         label: "Toggle Zen mode",
         hint: formatShortcutText(shortcuts.toggleZenMode, mac),

@@ -202,7 +202,8 @@ export type View =
   | { type: "snippets" }
   | { type: "templates" }
   | { type: "graph" }
-  | { type: "library" };
+  | { type: "library" }
+  | { type: "studio" };
 
 export type LibraryKind = "book" | "manga";
 
@@ -351,6 +352,32 @@ export interface DownloadedChapter {
   folderRel: string;
   pageFiles: string[];
   downloadedAt: number;
+}
+
+// ---- Inkwell (writing studio) ----
+
+export interface StudioChapter {
+  id: string;
+  title: string;
+  content: string;
+  wordCount: number;
+  updatedAt: number;
+}
+
+export interface StudioProject {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  chapters: StudioChapter[];
+}
+
+export interface StudioProjectSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
+  chapterCount: number;
+  wordCount: number;
 }
 
 export type DebugLevel = "error" | "warn" | "panic";

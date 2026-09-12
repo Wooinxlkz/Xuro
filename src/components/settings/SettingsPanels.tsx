@@ -1035,7 +1035,7 @@ export function DebugSettings() {
             onClick={runHealthCheck}
           >
             <RefreshCw size={12.5} strokeWidth={1.75} />
-            Run check
+            Run
           </Button>
         }
       >

@@ -1,6 +1,6 @@
 [package]
 name = "Xuro"
-version = "0.1.5"
+version = "0.1.7"
 description = "Local-first markdown notes"
 authors = ["Xuro"]
 license-file = "LICENSE"

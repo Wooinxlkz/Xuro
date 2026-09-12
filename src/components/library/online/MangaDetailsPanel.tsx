@@ -3,6 +3,7 @@ import {
   Check,
   ChevronDown,
   Download,
+  ExternalLink,
   Heart,
   Loader2,
   Play,
@@ -10,6 +11,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -162,9 +164,21 @@ export function MangaDetailsPanel({ onClose }: { onClose: () => void }) {
               Loading chapters…
             </div>
           ) : chapters.length === 0 ? (
-            <p className="p-4 text-center text-[12px] text-faint">
-              No chapters in this language yet.
-            </p>
+            <div className="flex flex-col items-center gap-2 p-4 text-center">
+              <p className="text-[12px] text-faint">No chapters in this language yet.</p>
+              <button
+                type="button"
+                onClick={() =>
+                  void openUrl(
+                    `https://www.google.com/search?q=${encodeURIComponent(`"${details.title}" read online`)}`,
+                  )
+                }
+                className="flex items-center gap-1.5 text-[11.5px] font-medium text-faint hover:text-ink"
+              >
+                <ExternalLink size={12} strokeWidth={2} />
+                Search other sources
+              </button>
+            </div>
           ) : (
             chapters.map((chapter) => {
               const isDownloaded = mangaDownloads.some((d) => d.chapterId === chapter.id);

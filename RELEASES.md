@@ -2,6 +2,32 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
+## [0.1.7] — September 11, 2026
+
+Introducing Inkwell — a new writing studio, right in Xuro
+
+### Added
+
+- **Inkwell**, a brand-new tab for long-form writing: novels, fanfiction, scripts — anything told in chapters. This first version covers prose writing end to end:
+  - Create a project, write chapters in a real rich-text editor (bold/italic/underline/strikethrough, headings, lists, blockquotes, undo/redo) with autosave.
+  - Reorder, rename, and delete chapters from a sidebar; a running word count for each chapter and the whole project.
+  - Export a project as Markdown, plain text, or a single PDF covering every chapter.
+  - Entirely its own module, storage, and tab — doesn't touch Notes or Library in any way.
+  - This is Phase 1 (prose mode) of a larger plan — a visual "panel mode" for manga/manhwa-style page layouts, templates, and themes is planned for a future release.
+
+## [0.1.6] — September 11, 2026
+
+Library restructure: local search stays local, Books gets an Online tab, downloads are easier to find
+
+### Changed
+
+- **Library search no longer reaches the internet.** The top search box in both Books and Manga now only ever filters what's already in "Your library" — it used to also fire a live catalog search in the background, so a local search and a catalog search were happening from the same box at once. Catalog browsing now lives entirely in its own tab.
+- **Books now has the same "My Library" / "Online" split Manga has.** The Online tab is a dedicated Open Library search — same catalog as before, its own search box, clearly separate from your local shelf.
+- **Downloaded manga now shows up in "My Library" too**, grouped by manga, not just inside Online Manga's own Downloads tab — no need to switch tabs to read something you already downloaded.
+- Added a sort option ("Recently added" / "Title A–Z") to the local library view.
+- Manga details: when a manga has no chapters in your chosen language, added a "Search other sources" link that opens a normal web search in your browser. (We looked into adding a second manga catalog API as an automatic fallback — there isn't a second MangaDex-quality official one; every alternative is unofficial reverse-engineered scraping, which we're not going to build on for something this fragile and ToS-risky. This is the safe version of that idea.)
+- Settings → Diagnostics: "Run check" button label shortened so it no longer wraps awkwardly.
+
 ## [0.1.5] — September 11, 2026
 
 Bug fixes for Online Manga, and a better Diagnostics panel

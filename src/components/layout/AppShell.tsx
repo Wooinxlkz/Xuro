@@ -39,6 +39,7 @@ import { SnippetsPage } from "@/components/snippets/SnippetsPage";
 import { TemplatesPage } from "@/components/templates/TemplatesPage";
 import { GraphView } from "@/components/graph/GraphView";
 import { LibraryPage } from "@/components/library/LibraryPage";
+import { StudioPage } from "@/components/studio/StudioPage";
 const CanvasEditor = lazy(() =>
   import("@/components/canvas/CanvasEditor").then((module) => ({
     default: module.CanvasEditor,
@@ -227,7 +228,9 @@ export function AppShell() {
                               ? "Graph"
                               : view?.type === "library"
                                 ? "Library"
-                                : ""}
+                                : view?.type === "studio"
+                                  ? "Inkwell"
+                                  : ""}
             </ActionSwapText>
           )}
 
@@ -524,6 +527,11 @@ export function AppShell() {
           {view?.type === "library" && (
             <div className="absolute inset-0">
               <LibraryPage />
+            </div>
+          )}
+          {view?.type === "studio" && (
+            <div className="absolute inset-0">
+              <StudioPage />
             </div>
           )}
           {view?.type === "canvas" && (

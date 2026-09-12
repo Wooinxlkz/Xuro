@@ -31,6 +31,9 @@ import type {
   MangaReadingProgress,
   MangaTag,
   SearchHit,
+  StudioChapter,
+  StudioProject,
+  StudioProjectSummary,
   Snippet,
   TagEntry,
   Template,
@@ -299,6 +302,38 @@ export const ipc = {
   debugLogList: () => call<DebugEntry[]>("debug_log_list"),
   debugLogClear: () => call<void>("debug_log_clear"),
   debugHealthCheck: () => call<HealthCheck>("debug_health_check"),
+
+  // ---- Inkwell (writing studio) ----
+  studioList: () => call<StudioProjectSummary[]>("studio_list"),
+  studioGet: (projectId: string) => call<StudioProject>("studio_get", { projectId }),
+  studioCreate: (title: string) => call<StudioProject>("studio_create", { title }),
+  studioRename: (projectId: string, title: string) =>
+    call<StudioProjectSummary>("studio_rename", { projectId, title }),
+  studioDelete: (projectId: string) => call<void>("studio_delete", { projectId }),
+  studioAddChapter: (projectId: string, title: string) =>
+    call<StudioChapter>("studio_add_chapter", { projectId, title }),
+  studioUpdateChapter: (
+    projectId: string,
+    chapterId: string,
+    title: string,
+    content: string,
+    wordCount: number,
+  ) =>
+    call<StudioChapter>("studio_update_chapter", {
+      projectId,
+      chapterId,
+      title,
+      content,
+      wordCount,
+    }),
+  studioDeleteChapter: (projectId: string, chapterId: string) =>
+    call<void>("studio_delete_chapter", { projectId, chapterId }),
+  studioReorderChapters: (projectId: string, orderedIds: string[]) =>
+    call<StudioProject>("studio_reorder_chapters", { projectId, orderedIds }),
+  studioExportText: (projectTitle: string, extension: string, text: string) =>
+    call<string | null>("studio_export_text", { projectTitle, extension, text }),
+  studioExportPdf: (projectTitle: string, pdfBase64: string) =>
+    call<string | null>("studio_export_pdf", { projectTitle, pdfBase64 }),
   libraryPickUploadFile: () => call<string | null>("library_pick_upload_file"),
 
   bookmarksList: () => call<Bookmark[]>("bookmarks_list"),

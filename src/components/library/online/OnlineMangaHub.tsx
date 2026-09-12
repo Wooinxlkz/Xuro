@@ -358,7 +358,7 @@ function HistorySection() {
   );
 }
 
-function DownloadsSection() {
+export function DownloadsSection() {
   const downloads = useOnlineManga((s) => s.downloads);
   const removeDownload = useOnlineManga((s) => s.removeDownload);
   const [readingChapter, setReadingChapter] = useState<

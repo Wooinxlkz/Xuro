@@ -26,6 +26,7 @@ mod pins;
 mod quick_capture;
 mod search;
 mod snippets;
+mod studio;
 mod tags;
 mod templates;
 mod todos;
@@ -227,6 +228,17 @@ pub fn run() {
             commands::manga_download_chapter,
             commands::manga_download_remove,
             commands::manga_download_read_page,
+            commands::studio_list,
+            commands::studio_get,
+            commands::studio_create,
+            commands::studio_rename,
+            commands::studio_delete,
+            commands::studio_add_chapter,
+            commands::studio_update_chapter,
+            commands::studio_delete_chapter,
+            commands::studio_reorder_chapters,
+            commands::studio_export_text,
+            commands::studio_export_pdf,
             commands::debug_log_add,
             commands::debug_log_list,
             commands::debug_log_clear,

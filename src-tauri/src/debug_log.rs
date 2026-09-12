@@ -111,7 +111,7 @@ pub struct HealthCheck {
 async fn reachable(url: &str) -> bool {
     let Ok(client) = reqwest::Client::builder()
         .timeout(Duration::from_secs(6))
-        .user_agent("Xuro/0.1.5")
+        .user_agent("Xuro/0.1.7")
         .build()
     else {
         return false;

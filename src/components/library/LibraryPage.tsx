@@ -18,11 +18,12 @@ import { Modal } from "@/components/ui/Modal";
 import { cx } from "@/lib/utils";
 import type { LibraryItem, LibraryKind, LibrarySearchResult } from "@/lib/types";
 import { useLibrary, type LibraryViewMode } from "@/stores/library";
+import { useOnlineManga } from "@/stores/onlineManga";
 import { useVault } from "@/stores/vault";
 import { PdfReader } from "./PdfReader";
-import { OnlineMangaHub } from "./online/OnlineMangaHub";
+import { OnlineMangaHub, DownloadsSection } from "./online/OnlineMangaHub";
 
-type MangaSubTab = "mine" | "online";
+type LibrarySubTab = "mine" | "online";
 
 const VIEW_MODES: Array<{ mode: LibraryViewMode; icon: typeof List; label: string }> = [
   { mode: "list", icon: List, label: "List" },
@@ -31,13 +32,10 @@ const VIEW_MODES: Array<{ mode: LibraryViewMode; icon: typeof List; label: strin
 ];
 
 export function LibraryPage() {
-  const { items, loaded, viewMode, searchKind, searchResults, searching, pickedFile } =
-    useLibrary();
+  const { items, loaded, viewMode, searchKind, pickedFile } = useLibrary();
   const load = useLibrary((s) => s.load);
   const setViewMode = useLibrary((s) => s.setViewMode);
   const setSearchKind = useLibrary((s) => s.setSearchKind);
-  const search = useLibrary((s) => s.search);
-  const addFromSearch = useLibrary((s) => s.addFromSearch);
   const pickFile = useLibrary((s) => s.pickFile);
   const remove = useLibrary((s) => s.remove);
   const attachFile = useLibrary((s) => s.attachFile);
@@ -45,22 +43,23 @@ export function LibraryPage() {
 
   const [query, setQuery] = useState("");
   const [readingItem, setReadingItem] = useState<LibraryItem | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Only ever relevant while searchKind === "manga" — Books keeps its
-  // original single-view layout untouched. Defaults to "mine" so nothing
-  // about the existing Manga experience changes until the person actively
-  // opts into Online.
-  const [mangaSubTab, setMangaSubTab] = useState<MangaSubTab>("mine");
+  // The top search box only ever filters what's already in "Your library"
+  // now — catalog browsing lives entirely in its own "Online" sub-tab
+  // (BookOnlineTab for books, OnlineMangaHub for manga), each with its own
+  // separate search box, so the two can never mix.
+  const [subTab, setSubTab] = useState<LibrarySubTab>("mine");
+  const [sortBy, setSortBy] = useState<"recent" | "title">("recent");
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const onQueryChange = (value: string) => {
-    setQuery(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => void search(value), 350);
-  };
+  // Online Manga's follows/downloads need to be loaded even if the person
+  // never opens the "Online Manga" sub-tab themselves — the "My Library"
+  // view's downloaded-chapters shelf below depends on it too.
+  useEffect(() => {
+    if (searchKind === "manga") void useOnlineManga.getState().init();
+  }, [searchKind]);
 
   const openFile = (item: LibraryItem) => {
     if (!item.fileRel || !root) return;
@@ -76,23 +75,21 @@ export function LibraryPage() {
     );
   };
 
-  const alreadySaved = (result: LibrarySearchResult) =>
-    items.some(
-      (item) => item.title === result.title && item.kind === result.kind && !item.fileRel,
-    );
-
-  // The saved-items grid stays visible and filters alongside the catalog
-  // search instead of disappearing behind it — so typing a query answers
-  // both "what can I add?" and "do I already have this?" at once.
+  // The saved-items grid filters as you type — local-only, no network call.
   const libraryMatches = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return items;
-    return items.filter(
-      (item) =>
-        item.title.toLowerCase().includes(term) ||
-        (item.author?.toLowerCase().includes(term) ?? false),
-    );
-  }, [items, query]);
+    const matched = term
+      ? items.filter(
+          (item) =>
+            item.title.toLowerCase().includes(term) ||
+            (item.author?.toLowerCase().includes(term) ?? false),
+        )
+      : items;
+    const sorted = [...matched];
+    if (sortBy === "title") sorted.sort((a, b) => a.title.localeCompare(b.title));
+    else sorted.sort((a, b) => b.addedAt - a.addedAt);
+    return sorted;
+  }, [items, query, sortBy]);
 
   if (!loaded) return null;
 
@@ -143,9 +140,9 @@ export function LibraryPage() {
             />
             <Input
               value={query}
-              placeholder={`Search ${searchKind === "book" ? "books" : "manga"}…`}
+              placeholder={`Search your ${searchKind === "book" ? "books" : "manga"}…`}
               className="pl-8"
-              onChange={(e) => onQueryChange(e.target.value)}
+              onChange={(e) => setQuery(e.target.value)}
             />
           </div>
           <Button size="md" variant="secondary" onClick={() => void pickFile()}>
@@ -154,50 +151,41 @@ export function LibraryPage() {
           </Button>
         </div>
 
-        {/* Manga-only: Online Manga is a clearly separate mode from the
-            existing local library above — Books never sees this toggle,
-            and picking "My Library" here reproduces the exact original
-            Manga experience untouched. */}
-        {searchKind === "manga" && (
-          <div className="mb-3 flex items-center gap-1 rounded-lg border border-line-soft bg-panel p-0.5">
-            {([
-              { key: "mine", label: "My Library" },
-              { key: "online", label: "Online Manga" },
-            ] as const).map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setMangaSubTab(key)}
-                className={cx(
-                  "rounded-md px-2.5 py-1 text-[12px] transition-colors duration-100",
-                  mangaSubTab === key ? "bg-active text-ink font-medium" : "text-faint hover:text-ink",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Same split for both kinds now: "My Library" is exactly the
+            original single-view experience (search box filters only what
+            you already have), "Online" is a dedicated catalog-browsing
+            mode with its own separate search — the two searches never mix,
+            so the top box can't accidentally reach out to the internet. */}
+        <div className="mb-3 flex items-center gap-1 rounded-lg border border-line-soft bg-panel p-0.5">
+          {([
+            { key: "mine", label: "My Library" },
+            { key: "online", label: searchKind === "book" ? "Online" : "Online Manga" },
+          ] as const).map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSubTab(key)}
+              className={cx(
+                "rounded-md px-2.5 py-1 text-[12px] transition-colors duration-100",
+                subTab === key ? "bg-active text-ink font-medium" : "text-faint hover:text-ink",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-        {searchKind === "manga" && mangaSubTab === "online" ? (
-          <OnlineMangaHub />
+        {subTab === "online" ? (
+          searchKind === "manga" ? (
+            <OnlineMangaHub />
+          ) : (
+            <BookOnlineTab />
+          )
         ) : (
           <>
-            {query.trim().length > 0 && (
-              <>
-                <p className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-faint">
-                  Add from catalog
-                </p>
-                <SearchResults
-                  results={searchResults}
-                  searching={searching}
-                  onAdd={addFromSearch}
-                  alreadySaved={alreadySaved}
-                />
-              </>
-            )}
+            {searchKind === "manga" && <MangaDownloadsShelf />}
 
-            <div className="mt-5">
+            <div>
               <div className="mb-2.5 flex items-center gap-2">
                 <p className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">
                   Your library
@@ -207,18 +195,28 @@ export function LibraryPage() {
                     {libraryMatches.length} matching "{query.trim()}"
                   </p>
                 )}
+                {items.length > 1 && (
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as "recent" | "title")}
+                    className="ml-auto h-6 rounded-md border border-line-soft bg-panel px-1.5 text-[10.5px] text-faint"
+                  >
+                    <option value="recent">Recently added</option>
+                    <option value="title">Title A–Z</option>
+                  </select>
+                )}
               </div>
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
                   <BookOpen size={22} strokeWidth={1.5} className="text-faint" />
                   <p className="text-[13px] text-muted">Your library is empty</p>
                   <p className="max-w-[280px] text-[11.5px] text-faint">
-                    Search above to add a book or manga, or upload a file of your own.
+                    Upload a file of your own, or check "{searchKind === "book" ? "Online" : "Online Manga"}" above to add something from the catalog.
                   </p>
                 </div>
               ) : libraryMatches.length === 0 ? (
                 <p className="py-10 text-center text-[12px] text-faint">
-                  Nothing in your library matches "{query.trim()}" — try "Add from catalog" above.
+                  Nothing in your library matches "{query.trim()}".
                 </p>
               ) : viewMode === "list" ? (
                 <ListView items={libraryMatches} onOpen={openFile} onRemove={remove} onAttach={attachFile} />
@@ -235,6 +233,82 @@ export function LibraryPage() {
       {pickedFile && <UploadDialog defaultKind={searchKind} />}
       {readingItem && (
         <PdfReader key={readingItem.id} item={readingItem} onClose={() => setReadingItem(null)} />
+      )}
+    </div>
+  );
+}
+
+/** A compact "you have these offline" shelf on top of the manga "My
+ * Library" view — Online Manga downloads live in their own store and their
+ * own vault folder (`Library/OnlineManga/…`), completely separate from
+ * this page's `library.json` items, but they should still be easy to find
+ * and open without switching to the Online Manga tab. Renders nothing at
+ * all if there's nothing downloaded yet, so it never clutters an
+ * otherwise-empty local library. */
+function MangaDownloadsShelf() {
+  const downloads = useOnlineManga((s) => s.downloads);
+  if (downloads.length === 0) return null;
+  return (
+    <div className="mb-6">
+      <p className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-faint">
+        Downloaded for offline reading
+      </p>
+      <DownloadsSection />
+    </div>
+  );
+}
+
+/** Books' equivalent of Online Manga's Discover tab — its own search box
+ * against Open Library, entirely separate from the local-only box at the
+ * top of the page. Self-contained: pulls everything it needs straight
+ * from the library store rather than through props, same pattern
+ * OnlineMangaHub uses for its own store. */
+function BookOnlineTab() {
+  const items = useLibrary((s) => s.items);
+  const searchResults = useLibrary((s) => s.searchResults);
+  const searching = useLibrary((s) => s.searching);
+  const search = useLibrary((s) => s.search);
+  const addFromSearch = useLibrary((s) => s.addFromSearch);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onChange = (value: string) => {
+    setCatalogQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => void search(value), 350);
+  };
+
+  const alreadySaved = (result: LibrarySearchResult) =>
+    items.some(
+      (item) => item.title === result.title && item.kind === result.kind && !item.fileRel,
+    );
+
+  return (
+    <div>
+      <div className="relative mb-3">
+        <Search
+          size={13}
+          strokeWidth={2}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
+        />
+        <Input
+          value={catalogQuery}
+          placeholder="Search Open Library…"
+          className="pl-8"
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+      {catalogQuery.trim().length === 0 ? (
+        <p className="py-10 text-center text-[12px] text-faint">
+          Search to browse and add books from Open Library.
+        </p>
+      ) : (
+        <SearchResults
+          results={searchResults}
+          searching={searching}
+          onAdd={addFromSearch}
+          alreadySaved={alreadySaved}
+        />
       )}
     </div>
   );

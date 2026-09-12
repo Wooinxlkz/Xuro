@@ -15,6 +15,7 @@ use crate::manga_online::{
     self, DownloadedChapter, HistoryEntry, MangaBookmarkEntry, MangaFollow, ReadingProgress,
 };
 use crate::manga_source::{self, MangaBrowseParams, MangaChapter, MangaDetails, MangaPage, MangaTag};
+use crate::studio::{self, Chapter, Project, ProjectSummary};
 use crate::search::SearchHit;
 use crate::todos::{self, Todo};
 use crate::vault::{self, TreeNode};
@@ -929,6 +930,137 @@ pub fn manga_download_read_page(
     page_index: usize,
 ) -> AppResult<String> {
     manga_online::read_downloaded_page(&state.root()?, &chapter_id, page_index)
+}
+
+// ---- Inkwell (studio) ----
+
+#[tauri::command]
+pub fn studio_list(state: State<'_, AppState>) -> AppResult<Vec<ProjectSummary>> {
+    studio::list(&state.root()?)
+}
+
+#[tauri::command]
+pub fn studio_get(state: State<'_, AppState>, project_id: String) -> AppResult<Project> {
+    studio::get(&state.root()?, &project_id)
+}
+
+#[tauri::command]
+pub fn studio_create(state: State<'_, AppState>, title: String) -> AppResult<Project> {
+    studio::create(&state.root()?, &title)
+}
+
+#[tauri::command]
+pub fn studio_rename(
+    state: State<'_, AppState>,
+    project_id: String,
+    title: String,
+) -> AppResult<ProjectSummary> {
+    studio::rename(&state.root()?, &project_id, &title)
+}
+
+#[tauri::command]
+pub fn studio_delete(state: State<'_, AppState>, project_id: String) -> AppResult<()> {
+    studio::delete(&state.root()?, &project_id)
+}
+
+#[tauri::command]
+pub fn studio_add_chapter(
+    state: State<'_, AppState>,
+    project_id: String,
+    title: String,
+) -> AppResult<Chapter> {
+    studio::add_chapter(&state.root()?, &project_id, &title)
+}
+
+#[tauri::command]
+pub fn studio_update_chapter(
+    state: State<'_, AppState>,
+    project_id: String,
+    chapter_id: String,
+    title: String,
+    content: String,
+    word_count: u32,
+) -> AppResult<Chapter> {
+    studio::update_chapter(&state.root()?, &project_id, &chapter_id, &title, &content, word_count)
+}
+
+#[tauri::command]
+pub fn studio_delete_chapter(
+    state: State<'_, AppState>,
+    project_id: String,
+    chapter_id: String,
+) -> AppResult<()> {
+    studio::delete_chapter(&state.root()?, &project_id, &chapter_id)
+}
+
+#[tauri::command]
+pub fn studio_reorder_chapters(
+    state: State<'_, AppState>,
+    project_id: String,
+    ordered_ids: Vec<String>,
+) -> AppResult<Project> {
+    studio::reorder_chapters(&state.root()?, &project_id, &ordered_ids)
+}
+
+/// Saves plain text (Markdown or .txt) to a location the person picks —
+/// the frontend flattens Tiptap's HTML to plain text itself (trivial via
+/// `editor.getText()`), so this command is just "open a save dialog and
+/// write bytes", same shape as the other export commands below it.
+#[tauri::command]
+pub async fn studio_export_text(
+    app: AppHandle,
+    project_title: String,
+    extension: String,
+    text: String,
+) -> AppResult<Option<String>> {
+    let file_name = format!("{}.{}", crate::util::sanitize_name(&project_title), extension);
+    let picked = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || app.dialog().file().set_file_name(file_name).blocking_save_file()
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?;
+    let Some(dest) = picked else {
+        return Ok(None);
+    };
+    let path = dest
+        .into_path()
+        .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+    std::fs::write(&path, text)?;
+    Ok(Some(path.display().to_string()))
+}
+
+/// Same rendered-client-side-to-PDF approach as `export_note_pdf`, kept as
+/// its own command rather than reused since that one is tightly coupled to
+/// an existing note (`notes::read_note`) — Inkwell projects aren't notes.
+#[tauri::command]
+pub async fn studio_export_pdf(
+    app: AppHandle,
+    project_title: String,
+    pdf_base64: String,
+) -> AppResult<Option<String>> {
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
+
+    let file_name = format!("{}.pdf", crate::util::sanitize_name(&project_title));
+    let bytes = STANDARD
+        .decode(pdf_base64)
+        .map_err(|e| AppError::InvalidInput(format!("invalid PDF data: {e}")))?;
+
+    let picked = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || app.dialog().file().set_file_name(file_name).blocking_save_file()
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?;
+    let Some(dest) = picked else {
+        return Ok(None);
+    };
+    let path = dest
+        .into_path()
+        .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+    std::fs::write(&path, bytes)?;
+    Ok(Some(path.display().to_string()))
 }
 
 // ---- debug log ----
