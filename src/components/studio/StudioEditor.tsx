@@ -149,8 +149,12 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
           image: { type: "jpeg", quality: 0.95 },
           html2canvas: { scale: 1, backgroundColor: "#ffffff", useCORS: true },
           jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+          // `pagebreak` is a real, documented html2pdf.js option, but its
+          // bundled type definitions don't declare it — `as any` bypasses
+          // that gap rather than dropping the option.
           pagebreak: { mode: ["css"] },
-        })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)
         .from(wrapper)
         .outputPdf("arraybuffer")) as ArrayBuffer;
       const base64 = arrayBufferToBase64(arrayBuffer);
