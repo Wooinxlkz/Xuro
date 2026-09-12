@@ -25,18 +25,27 @@ import Typography from "@tiptap/extension-typography";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import type { StudioChapter } from "@/lib/types";
 import { cx } from "@/lib/utils";
 import { useStudio } from "@/stores/studio";
 
-/** Inkwell's prose mode: a chapter list on the left, a single Tiptap
- * editor for whichever chapter is selected, and a toolbar above it. Each
- * chapter's content is Markdown (same content model the Notes editor
- * already uses), so exporting it is just handing that string to a file —
- * nothing Inkwell-specific to serialize. */
+// Excalidraw is a heavy bundle — same lazy-loading treatment AppShell
+// already gives the Canvas feature, so opening Inkwell (or a Prose
+// project) never pays for it.
+const PanelPageEditor = lazy(() =>
+  import("./PanelPageEditor").then((m) => ({ default: m.PanelPageEditor })),
+);
+
+type ExportFormat = "md" | "txt" | "pdf" | "png";
+
+/** Inkwell's editor shell: a chapter/page list on the left (labeled
+ * "Chapters" for Prose projects, "Pages" for Panel projects — same list,
+ * same reorder/delete/rename commands either way, since both kinds share
+ * one backend model), and either a Tiptap prose editor or an Excalidraw
+ * panel-layout canvas on the right, depending on the project's kind. */
 export function StudioEditor({ onClose }: { onClose: () => void }) {
   const project = useStudio((s) => s.activeProject);
   const activeChapterId = useStudio((s) => s.activeChapterId);
@@ -45,10 +54,14 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
   const deleteChapter = useStudio((s) => s.deleteChapter);
   const reorderChapters = useStudio((s) => s.reorderChapters);
   const renameProject = useStudio((s) => s.renameProject);
+  const updateChapter = useStudio((s) => s.updateChapter);
 
   const [exporting, setExporting] = useState(false);
+  const panelContainerRef = useRef<HTMLDivElement>(null);
 
   if (!project) return null;
+  const isPanel = project.kind === "panel";
+  const unit = isPanel ? "page" : "chapter";
   const chapter = project.chapters.find((c) => c.id === activeChapterId) ?? project.chapters[0];
   const totalWords = project.chapters.reduce((sum, c) => sum + c.wordCount, 0);
 
@@ -60,10 +73,103 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
     void reorderChapters(ids);
   };
 
-  const exportAs = async (format: "md" | "txt" | "pdf") => {
+  const exportPanelPng = async () => {
+    if (!chapter || !panelContainerRef.current) return;
+    const html2pdf = (await import("html2pdf.js")).default;
+    const canvas: HTMLCanvasElement = await html2pdf()
+      .set({ html2canvas: { scale: 2, backgroundColor: "#ffffff", useCORS: true } })
+      .from(panelContainerRef.current)
+      .toCanvas();
+    const dataUrl = canvas.toDataURL("image/png");
+    const base64 = dataUrl.split(",")[1] ?? "";
+    const { ipc } = await import("@/lib/ipc");
+    const saved = await ipc.studioExportImage(project.title, chapter.title || "page", base64);
+    if (saved) toast.success("Exported");
+  };
+
+  /** Multi-page PDF for Panel projects: flips through every page in the
+   * (already-mounted, already-working) editor one at a time, screenshots
+   * each with the exact same `.toCanvas()` step the single-page PNG export
+   * already uses, then assembles the captured images into one PDF using
+   * html2pdf.js's own documented page-break convention (a
+   * `html2pdf__page-break` element between sections, `pagebreak: {mode:
+   * ["css"]}`) — no PDF-manipulation library needed, no merging separate
+   * PDF byte buffers by hand. The page-flipping needs a short settle delay
+   * per page for Excalidraw to remount and paint before capturing; that
+   * delay is the one part of this that can't be verified without actually
+   * running it. */
+  const exportPanelPdf = async () => {
+    const container = panelContainerRef.current;
+    if (!container || project.chapters.length === 0) return;
+    const originalChapterId = activeChapterId ?? project.chapters[0]?.id ?? null;
+    const html2pdf = (await import("html2pdf.js")).default;
+
+    const images: string[] = [];
+    try {
+      for (let i = 0; i < project.chapters.length; i++) {
+        const c = project.chapters[i];
+        toast.info(`Capturing page ${i + 1} of ${project.chapters.length}…`, {
+          id: "inkwell-panel-pdf-export",
+        });
+        selectChapter(c.id);
+        // Let the store update propagate, PanelPageEditor remount (it's
+        // keyed by chapter.id), and Excalidraw actually paint the new
+        // scene before screenshotting it.
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const canvas: HTMLCanvasElement = await html2pdf()
+          .set({ html2canvas: { scale: 1.5, backgroundColor: "#ffffff", useCORS: true } })
+          .from(container)
+          .toCanvas();
+        images.push(canvas.toDataURL("image/jpeg", 0.92));
+      }
+    } finally {
+      if (originalChapterId) selectChapter(originalChapterId);
+      toast.dismiss("inkwell-panel-pdf-export");
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = "position:fixed;top:0;left:-10000px;width:780px;background:#fff;";
+    images.forEach((src, i) => {
+      const img = document.createElement("img");
+      img.src = src;
+      img.style.cssText = "display:block;width:100%;";
+      wrapper.appendChild(img);
+      if (i < images.length - 1) {
+        const pageBreak = document.createElement("div");
+        pageBreak.className = "html2pdf__page-break";
+        wrapper.appendChild(pageBreak);
+      }
+    });
+    document.body.appendChild(wrapper);
+    try {
+      const arrayBuffer = (await html2pdf()
+        .set({
+          margin: 0,
+          image: { type: "jpeg", quality: 0.95 },
+          html2canvas: { scale: 1, backgroundColor: "#ffffff", useCORS: true },
+          jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css"] },
+        })
+        .from(wrapper)
+        .outputPdf("arraybuffer")) as ArrayBuffer;
+      const base64 = arrayBufferToBase64(arrayBuffer);
+      const { ipc } = await import("@/lib/ipc");
+      const saved = await ipc.studioExportPdf(project.title, base64);
+      if (saved) toast.success("Exported");
+    } finally {
+      wrapper.remove();
+    }
+  };
+
+  const exportAs = async (format: ExportFormat) => {
     setExporting(true);
     try {
-      if (format === "pdf") {
+      if (format === "png") {
+        await exportPanelPng();
+      } else if (format === "pdf" && isPanel) {
+        await exportPanelPdf();
+      } else if (format === "pdf") {
         toast.info("Exporting to PDF can take a moment for longer projects…");
         const html2pdf = (await import("html2pdf.js")).default;
         const wrapper = document.createElement("div");
@@ -155,7 +261,7 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
                 onClick={() => selectChapter(c.id)}
                 className="min-w-0 flex-1 truncate text-left text-[12.5px] text-ink"
               >
-                {c.title || "Untitled chapter"}
+                {c.title || `Untitled ${unit}`}
               </button>
               <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
                 <button
@@ -192,23 +298,51 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
             className="mt-1 flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-faint hover:bg-hover hover:text-ink"
           >
             <Plus size={12} strokeWidth={2} />
-            Add chapter
+            Add {unit}
           </button>
         </div>
 
         <div className="border-t border-line-soft px-3 py-2 text-[10.5px] text-faint">
-          {totalWords.toLocaleString()} words total
+          {isPanel
+            ? `${project.chapters.length} page${project.chapters.length === 1 ? "" : "s"}`
+            : `${totalWords.toLocaleString()} words total`}
         </div>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {chapter && <ChapterToolbar chapter={chapter} exporting={exporting} onExport={exportAs} />}
-        {chapter ? (
-          <ChapterBody key={chapter.id} chapter={chapter} />
-        ) : (
+        {chapter && (
+          <ChapterToolbar
+            key={chapter.id}
+            chapter={chapter}
+            isPanel={isPanel}
+            exporting={exporting}
+            onExport={exportAs}
+            onRename={(title) => void updateChapter(chapter.id, title, chapter.content, chapter.wordCount)}
+          />
+        )}
+        {!chapter ? (
           <div className="flex flex-1 items-center justify-center text-[12.5px] text-faint">
-            Add a chapter to start writing.
+            Add a {unit} to get started.
           </div>
+        ) : isPanel ? (
+          <div ref={panelContainerRef} className="flex flex-1 overflow-hidden">
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center text-[12.5px] text-faint">
+                  <Loader2 size={14} className="mr-2 animate-spin" />
+                  Loading canvas…
+                </div>
+              }
+            >
+              <PanelPageEditor
+                key={chapter.id}
+                content={chapter.content}
+                onChange={(content) => void updateChapter(chapter.id, chapter.title, content, 0)}
+              />
+            </Suspense>
+          </div>
+        ) : (
+          <ChapterBody key={chapter.id} chapter={chapter} />
         )}
       </div>
     </div>
@@ -217,29 +351,52 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
 
 function ChapterToolbar({
   chapter,
+  isPanel,
   exporting,
   onExport,
+  onRename,
 }: {
   chapter: StudioChapter;
+  isPanel: boolean;
   exporting: boolean;
-  onExport: (format: "md" | "txt" | "pdf") => void;
+  onExport: (format: ExportFormat) => void;
+  onRename: (title: string) => void;
 }) {
   const [exportOpen, setExportOpen] = useState(false);
+  const [title, setTitle] = useState(chapter.title);
+  const options: Array<{ key: ExportFormat; label: string }> = isPanel
+    ? [
+        { key: "png", label: "PNG (current page)" },
+        { key: "pdf", label: "PDF (all pages)" },
+      ]
+    : [
+        { key: "md", label: "Markdown (.md)" },
+        { key: "txt", label: "Plain text (.txt)" },
+        { key: "pdf", label: "PDF (whole project)" },
+      ];
   return (
     <div className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-2">
-      <p className="text-[11px] text-faint">{chapter.wordCount.toLocaleString()} words</p>
-      <div className="relative">
+      {isPanel ? (
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => {
+            if (title.trim() && title.trim() !== chapter.title) onRename(title.trim());
+          }}
+          placeholder="Page title"
+          className="min-w-0 flex-1 bg-transparent text-[12.5px] font-medium text-ink outline-none placeholder:text-faint"
+        />
+      ) : (
+        <p className="text-[11px] text-faint">{chapter.wordCount.toLocaleString()} words</p>
+      )}
+      <div className="relative shrink-0">
         <Button size="sm" variant="secondary" loading={exporting} onClick={() => setExportOpen((v) => !v)}>
           <Download size={12.5} strokeWidth={1.8} />
           Export
         </Button>
         {exportOpen && (
           <div className="absolute right-0 z-10 mt-1 min-w-[160px] rounded-lg border border-line-soft bg-panel p-1 shadow-md shadow-black/10">
-            {[
-              { key: "md" as const, label: "Markdown (.md)" },
-              { key: "txt" as const, label: "Plain text (.txt)" },
-              { key: "pdf" as const, label: "PDF (whole project)" },
-            ].map((opt) => (
+            {options.map((opt) => (
               <button
                 key={opt.key}
                 type="button"

@@ -33,6 +33,7 @@ import type {
   SearchHit,
   StudioChapter,
   StudioProject,
+  StudioProjectKind,
   StudioProjectSummary,
   Snippet,
   TagEntry,
@@ -306,7 +307,8 @@ export const ipc = {
   // ---- Inkwell (writing studio) ----
   studioList: () => call<StudioProjectSummary[]>("studio_list"),
   studioGet: (projectId: string) => call<StudioProject>("studio_get", { projectId }),
-  studioCreate: (title: string) => call<StudioProject>("studio_create", { title }),
+  studioCreate: (title: string, kind: StudioProjectKind) =>
+    call<StudioProject>("studio_create", { title, kind }),
   studioRename: (projectId: string, title: string) =>
     call<StudioProjectSummary>("studio_rename", { projectId, title }),
   studioDelete: (projectId: string) => call<void>("studio_delete", { projectId }),
@@ -334,6 +336,8 @@ export const ipc = {
     call<string | null>("studio_export_text", { projectTitle, extension, text }),
   studioExportPdf: (projectTitle: string, pdfBase64: string) =>
     call<string | null>("studio_export_pdf", { projectTitle, pdfBase64 }),
+  studioExportImage: (projectTitle: string, pageTitle: string, imageBase64: string) =>
+    call<string | null>("studio_export_image", { projectTitle, pageTitle, imageBase64 }),
   libraryPickUploadFile: () => call<string | null>("library_pick_upload_file"),
 
   bookmarksList: () => call<Bookmark[]>("bookmarks_list"),

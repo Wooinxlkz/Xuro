@@ -356,6 +356,8 @@ export interface DownloadedChapter {
 
 // ---- Inkwell (writing studio) ----
 
+export type StudioProjectKind = "prose" | "panel";
+
 export interface StudioChapter {
   id: string;
   title: string;
@@ -367,6 +369,7 @@ export interface StudioChapter {
 export interface StudioProject {
   id: string;
   title: string;
+  kind: StudioProjectKind;
   createdAt: number;
   updatedAt: number;
   chapters: StudioChapter[];
@@ -375,6 +378,7 @@ export interface StudioProject {
 export interface StudioProjectSummary {
   id: string;
   title: string;
+  kind: StudioProjectKind;
   updatedAt: number;
   chapterCount: number;
   wordCount: number;

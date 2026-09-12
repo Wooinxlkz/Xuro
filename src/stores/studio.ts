@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import { toast } from "sonner";
 import { ipc } from "@/lib/ipc";
-import type { StudioChapter, StudioProject, StudioProjectSummary } from "@/lib/types";
+import type {
+  StudioChapter,
+  StudioProject,
+  StudioProjectKind,
+  StudioProjectSummary,
+} from "@/lib/types";
 
 const oops = (err: unknown) => toast.error(err instanceof Error ? err.message : String(err));
 
@@ -12,7 +17,7 @@ interface StudioState {
   activeChapterId: string | null;
 
   load: () => Promise<void>;
-  createProject: (title: string) => Promise<StudioProject | null>;
+  createProject: (title: string, kind: StudioProjectKind) => Promise<StudioProject | null>;
   openProject: (id: string) => Promise<void>;
   closeProject: () => void;
   renameProject: (id: string, title: string) => Promise<void>;
@@ -46,9 +51,9 @@ export const useStudio = create<StudioState>((set, get) => ({
     }
   },
 
-  createProject: async (title) => {
+  createProject: async (title, kind) => {
     try {
-      const project = await ipc.studioCreate(title);
+      const project = await ipc.studioCreate(title, kind);
       await get().load();
       return project;
     } catch (err) {

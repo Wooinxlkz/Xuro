@@ -239,6 +239,7 @@ pub fn run() {
             commands::studio_reorder_chapters,
             commands::studio_export_text,
             commands::studio_export_pdf,
+            commands::studio_export_image,
             commands::debug_log_add,
             commands::debug_log_list,
             commands::debug_log_clear,

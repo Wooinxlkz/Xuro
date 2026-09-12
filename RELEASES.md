@@ -2,6 +2,21 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
+## [0.1.8] — September 12, 2026
+
+Inkwell Panel mode — manga/manhwa page layouts
+
+### Added
+
+- **Inkwell now has two project kinds, chosen at creation:**
+  - **Prose** — exactly what shipped in 0.1.7 (chaptered rich-text writing).
+  - **Panel** (new) — manga/manhwa-style page layouts on a real canvas: a fixed-size page, a right sidebar with six pre-built panel layouts (full-page splash, 2/3/4-panel stacks, 2×2 grid, wide-top-plus-two), and three page themes (B&W Manga, Colored Manhwa, Vanilla) that set the page's background and panel-border color. Panels are ordinary shapes once placed — drag, resize, or delete them like anything else on the canvas. Excalidraw's own toolbar (already part of the canvas) adds ellipse/arrow/text/freehand-draw on top of that.
+  - Both kinds share one chapter/page list (reorder, rename, delete all work identically), one project grid, and one export button. Panel mode exports the current page as PNG, or the whole project as a multi-page PDF (it flips through every page automatically and assembles them).
+
+### Note on the Panel-mode PDF export
+
+- Building "export every page as one PDF" for a canvas-based editor is inherently trickier than Prose mode's text export — it works by briefly switching through every page in sequence and capturing each one, then assembling the results. This is the newest, least battle-tested part of this release; the single-page PNG export is the simpler, more proven fallback if the multi-page PDF ever produces an unexpected result on a particular project.
+
 ## [0.1.7] — September 11, 2026
 
 Introducing Inkwell — a new writing studio, right in Xuro

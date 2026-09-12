@@ -15,7 +15,7 @@ use crate::manga_online::{
     self, DownloadedChapter, HistoryEntry, MangaBookmarkEntry, MangaFollow, ReadingProgress,
 };
 use crate::manga_source::{self, MangaBrowseParams, MangaChapter, MangaDetails, MangaPage, MangaTag};
-use crate::studio::{self, Chapter, Project, ProjectSummary};
+use crate::studio::{self, Chapter, Project, ProjectKind, ProjectSummary};
 use crate::search::SearchHit;
 use crate::todos::{self, Todo};
 use crate::vault::{self, TreeNode};
@@ -945,8 +945,12 @@ pub fn studio_get(state: State<'_, AppState>, project_id: String) -> AppResult<P
 }
 
 #[tauri::command]
-pub fn studio_create(state: State<'_, AppState>, title: String) -> AppResult<Project> {
-    studio::create(&state.root()?, &title)
+pub fn studio_create(
+    state: State<'_, AppState>,
+    title: String,
+    kind: ProjectKind,
+) -> AppResult<Project> {
+    studio::create(&state.root()?, &title, kind)
 }
 
 #[tauri::command]
@@ -1046,6 +1050,44 @@ pub async fn studio_export_pdf(
     let bytes = STANDARD
         .decode(pdf_base64)
         .map_err(|e| AppError::InvalidInput(format!("invalid PDF data: {e}")))?;
+
+    let picked = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || app.dialog().file().set_file_name(file_name).blocking_save_file()
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?;
+    let Some(dest) = picked else {
+        return Ok(None);
+    };
+    let path = dest
+        .into_path()
+        .map_err(|e| AppError::InvalidPath(e.to_string()))?;
+    std::fs::write(&path, bytes)?;
+    Ok(Some(path.display().to_string()))
+}
+
+/// Panel mode's per-page image export (Prose mode has no equivalent —
+/// there's nothing visual to rasterize). Same save-dialog-and-write-bytes
+/// shape as the PDF export above.
+#[tauri::command]
+pub async fn studio_export_image(
+    app: AppHandle,
+    project_title: String,
+    page_title: String,
+    image_base64: String,
+) -> AppResult<Option<String>> {
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
+
+    let file_name = format!(
+        "{} - {}.png",
+        crate::util::sanitize_name(&project_title),
+        crate::util::sanitize_name(&page_title)
+    );
+    let bytes = STANDARD
+        .decode(image_base64)
+        .map_err(|e| AppError::InvalidInput(format!("invalid image data: {e}")))?;
 
     let picked = tauri::async_runtime::spawn_blocking({
         let app = app.clone();
