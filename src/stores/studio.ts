@@ -1,12 +1,7 @@
 import { create } from "zustand";
 import { toast } from "sonner";
 import { ipc } from "@/lib/ipc";
-import type {
-  StudioChapter,
-  StudioProject,
-  StudioProjectKind,
-  StudioProjectSummary,
-} from "@/lib/types";
+import type { ChapterKind, StudioChapter, StudioProject, StudioProjectSummary } from "@/lib/types";
 
 const oops = (err: unknown) => toast.error(err instanceof Error ? err.message : String(err));
 
@@ -17,14 +12,14 @@ interface StudioState {
   activeChapterId: string | null;
 
   load: () => Promise<void>;
-  createProject: (title: string, kind: StudioProjectKind) => Promise<StudioProject | null>;
+  createProject: (title: string, kind: ChapterKind) => Promise<StudioProject | null>;
   openProject: (id: string) => Promise<void>;
   closeProject: () => void;
   renameProject: (id: string, title: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
 
   selectChapter: (id: string) => void;
-  addChapter: () => Promise<void>;
+  addChapter: (kind: ChapterKind) => Promise<void>;
   updateChapter: (
     chapterId: string,
     title: string,
@@ -104,11 +99,11 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   selectChapter: (id) => set({ activeChapterId: id }),
 
-  addChapter: async () => {
+  addChapter: async (kind) => {
     const project = get().activeProject;
     if (!project) return;
     try {
-      const chapter = await ipc.studioAddChapter(project.id, "");
+      const chapter = await ipc.studioAddChapter(project.id, "", kind);
       set({
         activeProject: { ...project, chapters: [...project.chapters, chapter] },
         activeChapterId: chapter.id,

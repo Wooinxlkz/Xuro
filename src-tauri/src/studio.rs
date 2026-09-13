@@ -1,13 +1,17 @@
-//! Inkwell: Xuro's writing studio. Two project kinds share the exact same
-//! storage and CRUD below: Prose (chaptered long-form writing — the
-//! `content` string is Markdown, same content model the Notes editor
-//! already uses) and Panel (manga/manhwa-style page layouts — the
-//! `content` string is a serialized Excalidraw scene instead). A "chapter"
-//! is called a "page" in Panel mode on the frontend, but it's the same
-//! `Chapter` struct underneath — reusing one model rather than building a
-//! parallel one for Panel mode keeps this module small and means every
-//! existing Prose-mode command (add/delete/reorder/rename) already works
-//! for Panel mode too, unchanged.
+//! Inkwell: Xuro's writing studio. Every chapter/page has its own kind —
+//! Prose (chaptered long-form writing — `content` is Markdown, same
+//! content model the Notes editor already uses) or Panel (manga/manhwa
+//! page layouts — `content` is a serialized Excalidraw scene instead) —
+//! so one project can freely mix both: a novel with an illustrated title
+//! page, a comic with a prose afterword, whatever. Both kinds share the
+//! exact same `Chapter` struct and every CRUD function (add/delete/
+//! reorder/rename); only `kind` and how the frontend interprets `content`
+//! differ.
+//!
+//! (Earlier versions locked the *whole project* to one kind. `read()`
+//! migrates those old saves: since chapters never had their own `kind`
+//! field before, every chapter in an old project unconditionally inherits
+//! that project's old kind.)
 //!
 //! Deliberately its own module and its own storage, entirely separate
 //! from Notes and Library — a "project" here is never a note and never a
@@ -29,14 +33,14 @@ use crate::vault::DATA_DIR;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum ProjectKind {
+pub enum ChapterKind {
     Prose,
     Panel,
 }
 
-impl Default for ProjectKind {
+impl Default for ChapterKind {
     fn default() -> Self {
-        ProjectKind::Prose
+        ChapterKind::Prose
     }
 }
 
@@ -45,8 +49,10 @@ impl Default for ProjectKind {
 pub struct Chapter {
     pub id: String,
     pub title: String,
-    /// Markdown for a Prose-mode chapter, a serialized Excalidraw scene
-    /// (JSON string) for a Panel-mode page — the frontend is the only
+    #[serde(default)]
+    pub kind: ChapterKind,
+    /// Markdown for a Prose-kind chapter, a serialized Excalidraw scene
+    /// (JSON string) for a Panel-kind page — the frontend is the only
     /// thing that ever interprets this; Rust just stores and returns it.
     pub content: String,
     pub word_count: u32,
@@ -58,8 +64,11 @@ pub struct Chapter {
 pub struct Project {
     pub id: String,
     pub title: String,
-    #[serde(default)]
-    pub kind: ProjectKind,
+    /// Pre-0.1.9 saves had `kind` here, at the project level. Kept only to
+    /// read old files during migration in `read()` — never written back
+    /// out (see `skip_serializing`), so a resave drops it for good.
+    #[serde(default, rename = "kind", skip_serializing)]
+    legacy_kind: Option<ChapterKind>,
     pub created_at: i64,
     pub updated_at: i64,
     pub chapters: Vec<Chapter>,
@@ -70,21 +79,27 @@ pub struct Project {
 pub struct ProjectSummary {
     pub id: String,
     pub title: String,
-    #[serde(default)]
-    pub kind: ProjectKind,
     pub updated_at: i64,
     pub chapter_count: usize,
+    /// How many of `chapter_count` are Panel-kind — lets the frontend show
+    /// "Prose" / "Panel" / "Mixed" without needing the full project.
+    pub panel_count: usize,
     pub word_count: u32,
 }
 
 impl Project {
     fn summary(&self) -> ProjectSummary {
+        let panel_count = self
+            .chapters
+            .iter()
+            .filter(|c| c.kind == ChapterKind::Panel)
+            .count();
         ProjectSummary {
             id: self.id.clone(),
             title: self.title.clone(),
-            kind: self.kind,
             updated_at: self.updated_at,
             chapter_count: self.chapters.len(),
+            panel_count,
             word_count: self.chapters.iter().map(|c| c.word_count).sum(),
         }
     }
@@ -105,7 +120,15 @@ fn read(root: &Path) -> AppResult<Store> {
     if !path.exists() {
         return Ok(Store::default());
     }
-    Ok(serde_json::from_str(&fs::read_to_string(path)?).unwrap_or_default())
+    let mut store: Store = serde_json::from_str(&fs::read_to_string(path)?).unwrap_or_default();
+    for project in &mut store.projects {
+        if let Some(legacy) = project.legacy_kind.take() {
+            for chapter in &mut project.chapters {
+                chapter.kind = legacy;
+            }
+        }
+    }
+    Ok(store)
 }
 
 fn save(root: &Path, store: &Store) -> AppResult<()> {
@@ -119,6 +142,13 @@ fn find_project<'a>(store: &'a mut Store, project_id: &str) -> AppResult<&'a mut
         .iter_mut()
         .find(|p| p.id == project_id)
         .ok_or_else(|| AppError::NotFound(project_id.to_string()))
+}
+
+fn default_title(kind: ChapterKind, index: usize) -> String {
+    match kind {
+        ChapterKind::Prose => format!("Chapter {index}"),
+        ChapterKind::Panel => format!("Page {index}"),
+    }
 }
 
 pub fn list(root: &Path) -> AppResult<Vec<ProjectSummary>> {
@@ -136,13 +166,9 @@ pub fn get(root: &Path, project_id: &str) -> AppResult<Project> {
         .ok_or_else(|| AppError::NotFound(project_id.to_string()))
 }
 
-pub fn create(root: &Path, title: &str, kind: ProjectKind) -> AppResult<Project> {
+pub fn create(root: &Path, title: &str, first_chapter_kind: ChapterKind) -> AppResult<Project> {
     let mut store = read(root)?;
     let now = now_ms();
-    let first_title = match kind {
-        ProjectKind::Prose => "Chapter 1",
-        ProjectKind::Panel => "Page 1",
-    };
     let project = Project {
         id: Uuid::new_v4().to_string(),
         title: if title.trim().is_empty() {
@@ -150,12 +176,13 @@ pub fn create(root: &Path, title: &str, kind: ProjectKind) -> AppResult<Project>
         } else {
             title.trim().to_string()
         },
-        kind,
+        legacy_kind: None,
         created_at: now,
         updated_at: now,
         chapters: vec![Chapter {
             id: Uuid::new_v4().to_string(),
-            title: first_title.to_string(),
+            title: default_title(first_chapter_kind, 1),
+            kind: first_chapter_kind,
             content: String::new(),
             word_count: 0,
             updated_at: now,
@@ -187,21 +214,19 @@ pub fn delete(root: &Path, project_id: &str) -> AppResult<()> {
     save(root, &store)
 }
 
-pub fn add_chapter(root: &Path, project_id: &str, title: &str) -> AppResult<Chapter> {
+pub fn add_chapter(root: &Path, project_id: &str, title: &str, kind: ChapterKind) -> AppResult<Chapter> {
     let mut store = read(root)?;
     let now = now_ms();
     let project = find_project(&mut store, project_id)?;
-    let default_title = match project.kind {
-        ProjectKind::Prose => format!("Chapter {}", project.chapters.len() + 1),
-        ProjectKind::Panel => format!("Page {}", project.chapters.len() + 1),
-    };
+    let same_kind_count = project.chapters.iter().filter(|c| c.kind == kind).count();
     let chapter = Chapter {
         id: Uuid::new_v4().to_string(),
         title: if title.trim().is_empty() {
-            default_title
+            default_title(kind, same_kind_count + 1)
         } else {
             title.trim().to_string()
         },
+        kind,
         content: String::new(),
         word_count: 0,
         updated_at: now,
@@ -283,17 +308,18 @@ mod tests {
     fn create_starts_with_one_chapter() {
         let dir = tempdir().unwrap();
         ensure_layout(dir.path()).unwrap();
-        let project = create(dir.path(), "My Novel", ProjectKind::Prose).unwrap();
+        let project = create(dir.path(), "My Novel", ChapterKind::Prose).unwrap();
         assert_eq!(project.title, "My Novel");
         assert_eq!(project.chapters.len(), 1);
         assert_eq!(project.chapters[0].title, "Chapter 1");
+        assert_eq!(project.chapters[0].kind, ChapterKind::Prose);
     }
 
     #[test]
     fn update_chapter_stores_content_and_word_count() {
         let dir = tempdir().unwrap();
         ensure_layout(dir.path()).unwrap();
-        let project = create(dir.path(), "My Novel", ProjectKind::Prose).unwrap();
+        let project = create(dir.path(), "My Novel", ChapterKind::Prose).unwrap();
         let chapter_id = project.chapters[0].id.clone();
         let updated = update_chapter(
             dir.path(),
@@ -312,9 +338,9 @@ mod tests {
     fn reorder_chapters_matches_requested_order() {
         let dir = tempdir().unwrap();
         ensure_layout(dir.path()).unwrap();
-        let project = create(dir.path(), "My Novel", ProjectKind::Prose).unwrap();
-        let c2 = add_chapter(dir.path(), &project.id, "Chapter 2").unwrap();
-        let c3 = add_chapter(dir.path(), &project.id, "Chapter 3").unwrap();
+        let project = create(dir.path(), "My Novel", ChapterKind::Prose).unwrap();
+        let c2 = add_chapter(dir.path(), &project.id, "Chapter 2", ChapterKind::Prose).unwrap();
+        let c3 = add_chapter(dir.path(), &project.id, "Chapter 3", ChapterKind::Prose).unwrap();
         let c1_id = project.chapters[0].id.clone();
 
         let reordered = reorder_chapters(dir.path(), &project.id, &[c3.id.clone(), c1_id.clone()])
@@ -327,31 +353,49 @@ mod tests {
     fn delete_removes_project() {
         let dir = tempdir().unwrap();
         ensure_layout(dir.path()).unwrap();
-        let project = create(dir.path(), "Temp", ProjectKind::Prose).unwrap();
+        let project = create(dir.path(), "Temp", ChapterKind::Prose).unwrap();
         delete(dir.path(), &project.id).unwrap();
         assert!(get(dir.path(), &project.id).is_err());
     }
 
     #[test]
-    fn panel_projects_name_pages_not_chapters() {
+    fn a_project_can_mix_prose_and_panel_chapters() {
         let dir = tempdir().unwrap();
         ensure_layout(dir.path()).unwrap();
-        let project = create(dir.path(), "My Comic", ProjectKind::Panel).unwrap();
-        assert_eq!(project.kind, ProjectKind::Panel);
-        assert_eq!(project.chapters[0].title, "Page 1");
-        let second = add_chapter(dir.path(), &project.id, "").unwrap();
-        assert_eq!(second.title, "Page 2");
+        let project = create(dir.path(), "My Comic Novel", ChapterKind::Prose).unwrap();
+        let page = add_chapter(dir.path(), &project.id, "", ChapterKind::Panel).unwrap();
+        assert_eq!(page.title, "Page 1");
+        let chapter2 = add_chapter(dir.path(), &project.id, "", ChapterKind::Prose).unwrap();
+        assert_eq!(chapter2.title, "Chapter 2");
+
+        let full = get(dir.path(), &project.id).unwrap();
+        assert_eq!(full.chapters.len(), 3);
+        let summary = list(dir.path()).unwrap().into_iter().find(|p| p.id == project.id).unwrap();
+        assert_eq!(summary.chapter_count, 3);
+        assert_eq!(summary.panel_count, 1);
     }
 
     #[test]
-    fn missing_kind_in_saved_json_defaults_to_prose() {
-        // Guards backward compatibility: projects saved by earlier Inkwell
-        // versions (before Panel mode existed) have no `kind` field at all.
+    fn old_project_level_kind_migrates_onto_every_chapter() {
+        // Guards backward compatibility with 0.1.8 saves, where `kind`
+        // lived on the project and chapters had no `kind` field at all.
         let dir = tempdir().unwrap();
         ensure_layout(dir.path()).unwrap();
-        let raw = r#"{"projects":[{"id":"p1","title":"Old Project","createdAt":0,"updatedAt":0,"chapters":[]}]}"#;
+        let raw = r#"{"projects":[{"id":"p1","title":"Old Comic","kind":"panel","createdAt":0,"updatedAt":0,"chapters":[{"id":"c1","title":"Page 1","content":"","wordCount":0,"updatedAt":0},{"id":"c2","title":"Page 2","content":"","wordCount":0,"updatedAt":0}]}]}"#;
         fs::write(store_path(dir.path()), raw).unwrap();
         let project = get(dir.path(), "p1").unwrap();
-        assert_eq!(project.kind, ProjectKind::Prose);
+        assert_eq!(project.chapters[0].kind, ChapterKind::Panel);
+        assert_eq!(project.chapters[1].kind, ChapterKind::Panel);
+    }
+
+    #[test]
+    fn old_prose_only_project_with_no_kind_field_at_all_defaults_to_prose() {
+        // Even older (0.1.7) saves had no `kind` anywhere.
+        let dir = tempdir().unwrap();
+        ensure_layout(dir.path()).unwrap();
+        let raw = r#"{"projects":[{"id":"p1","title":"Old Novel","createdAt":0,"updatedAt":0,"chapters":[{"id":"c1","title":"Chapter 1","content":"","wordCount":0,"updatedAt":0}]}]}"#;
+        fs::write(store_path(dir.path()), raw).unwrap();
+        let project = get(dir.path(), "p1").unwrap();
+        assert_eq!(project.chapters[0].kind, ChapterKind::Prose);
     }
 }

@@ -3,21 +3,41 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
-import type { StudioProjectKind } from "@/lib/types";
+import type { ChapterKind, StudioProjectSummary } from "@/lib/types";
 import { cx } from "@/lib/utils";
 import { useStudio } from "@/stores/studio";
 import { StudioEditor } from "./StudioEditor";
 
-const KIND_META: Record<StudioProjectKind, { label: string; icon: typeof Feather; unit: string }> = {
+const KIND_META: Record<ChapterKind, { label: string; icon: typeof Feather; unit: string }> = {
   prose: { label: "Prose", icon: Feather, unit: "chapter" },
   panel: { label: "Panel", icon: Layers, unit: "page" },
 };
 
+/** A project can freely mix Prose chapters and Panel pages, so its
+ * "kind" for display purposes is derived from what's actually in it —
+ * pure Prose, pure Panel, or Mixed — rather than a fixed property. */
+function summaryLine(project: StudioProjectSummary): { icon: typeof Feather; text: string } {
+  const proseCount = project.chapterCount - project.panelCount;
+  if (project.panelCount === 0) {
+    return {
+      icon: Feather,
+      text: `Prose · ${proseCount} chapter${proseCount === 1 ? "" : "s"} · ${project.wordCount.toLocaleString()} words`,
+    };
+  }
+  if (proseCount === 0) {
+    return { icon: Layers, text: `Panel · ${project.panelCount} page${project.panelCount === 1 ? "" : "s"}` };
+  }
+  return {
+    icon: BookOpen,
+    text: `Mixed · ${proseCount} chapter${proseCount === 1 ? "" : "s"}, ${project.panelCount} page${project.panelCount === 1 ? "" : "s"}`,
+  };
+}
+
 /** Inkwell's home: a grid of writing projects, same "empty state → create
- * → grid" shape as Library. Every project is either Prose (chaptered
- * long-form writing, a Tiptap editor per chapter) or Panel (manga/manhwa
- * page layouts, an Excalidraw canvas per page) — chosen once at creation,
- * since the two modes need genuinely different editors and toolbars. */
+ * → grid" shape as Library. A project can mix Prose chapters (a Tiptap
+ * editor each) and Panel pages (an Excalidraw canvas each) freely —
+ * creation only picks what the *first* chapter is; more of either kind
+ * can be added from inside the project afterward. */
 export function StudioPage() {
   const projects = useStudio((s) => s.projects);
   const loaded = useStudio((s) => s.loaded);
@@ -30,7 +50,7 @@ export function StudioPage() {
 
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
-  const [newKind, setNewKind] = useState<StudioProjectKind>("prose");
+  const [newKind, setNewKind] = useState<ChapterKind>("prose");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -70,8 +90,8 @@ export function StudioPage() {
           </Button>
         </div>
         <p className="mb-6 text-[12px] text-faint">
-          Write chaptered stories and scripts, or lay out manga/manhwa-style pages — save, export,
-          and pick up right where you left off.
+          Write chaptered stories and scripts, lay out manga/manhwa-style pages, or mix both in one
+          project — save, export, and pick up right where you left off.
         </p>
 
         {!loaded ? (
@@ -90,8 +110,8 @@ export function StudioPage() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {projects.map((project) => {
-              const meta = KIND_META[project.kind];
-              const Icon = meta.icon;
+              const line = summaryLine(project);
+              const Icon = line.icon;
               return (
                 <div
                   key={project.id}
@@ -108,11 +128,7 @@ export function StudioPage() {
                     <p className="line-clamp-2 text-[13px] font-medium leading-tight text-ink">
                       {project.title}
                     </p>
-                    <p className="text-[10.5px] text-faint">
-                      {meta.label} · {project.chapterCount} {meta.unit}
-                      {project.chapterCount === 1 ? "" : "s"}
-                      {project.kind === "prose" && ` · ${project.wordCount.toLocaleString()} words`}
-                    </p>
+                    <p className="text-[10.5px] text-faint">{line.text}</p>
                   </button>
                   <button
                     type="button"
@@ -138,8 +154,9 @@ export function StudioPage() {
           <div className="w-[340px] rounded-xl border border-line bg-bg p-4">
             <p className="mb-3 text-[13.5px] font-semibold text-ink">New Inkwell project</p>
             <div className="flex flex-col gap-2.5">
+              <p className="text-[11px] text-faint">Start with:</p>
               <div className="flex gap-1.5 rounded-lg border border-line-soft bg-panel p-1">
-                {(Object.keys(KIND_META) as StudioProjectKind[]).map((kind) => {
+                {(Object.keys(KIND_META) as ChapterKind[]).map((kind) => {
                   const meta = KIND_META[kind];
                   const Icon = meta.icon;
                   return (
@@ -160,8 +177,8 @@ export function StudioPage() {
               </div>
               <p className="text-[10.5px] text-faint">
                 {newKind === "prose"
-                  ? "Chaptered long-form writing — novels, fanfiction, scripts."
-                  : "Manga/manhwa-style page layouts — panels, speech bubbles, shapes."}
+                  ? "Chaptered long-form writing — novels, fanfiction, scripts. You can add Panel pages to this project later too."
+                  : "Manga/manhwa-style page layouts — panels, shapes, and Excalidraw's own drawing tools. You can add Prose chapters to this project later too."}
               </p>
               <Input
                 autoFocus

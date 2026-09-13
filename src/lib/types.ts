@@ -356,11 +356,12 @@ export interface DownloadedChapter {
 
 // ---- Inkwell (writing studio) ----
 
-export type StudioProjectKind = "prose" | "panel";
+export type ChapterKind = "prose" | "panel";
 
 export interface StudioChapter {
   id: string;
   title: string;
+  kind: ChapterKind;
   content: string;
   wordCount: number;
   updatedAt: number;
@@ -369,7 +370,6 @@ export interface StudioChapter {
 export interface StudioProject {
   id: string;
   title: string;
-  kind: StudioProjectKind;
   createdAt: number;
   updatedAt: number;
   chapters: StudioChapter[];
@@ -378,9 +378,11 @@ export interface StudioProject {
 export interface StudioProjectSummary {
   id: string;
   title: string;
-  kind: StudioProjectKind;
   updatedAt: number;
   chapterCount: number;
+  /** How many of chapterCount are Panel-kind — 0 means all-Prose,
+   * chapterCount means all-Panel, anything else means Mixed. */
+  panelCount: number;
   wordCount: number;
 }
 

@@ -2,6 +2,23 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
+## [0.1.9] — September 12, 2026
+
+Inkwell fixes: mixed projects, dark theme, image tool, and Excalidraw's default menu
+
+### Changed
+
+- **A project can now mix Prose chapters and Panel pages freely** — `kind` used to lock the whole project to one mode; it now lives on each chapter/page instead. The sidebar's "+ Chapter" / "+ Page" buttons add either kind at any time, each shown with its own small icon in the list. Pre-0.1.9 projects migrate automatically (an old Panel project's chapters all become Panel pages, an old Prose project's stay Prose).
+- Export now follows the currently open item's kind: Markdown/text/PDF for Prose chapters, PNG/PDF for Panel pages — each PDF only pulls in chapters/pages of the matching kind, so a mixed project's prose doesn't end up inside the panel PDF or vice versa.
+
+### Fixed
+
+- **Panel mode's Excalidraw toolbar now matches Xuro's dark theme** — it was defaulting to Excalidraw's own light theme regardless of the app's theme, which is why its icons were hard to see. It now follows Xuro's theme the same way the existing Canvas feature already does.
+- **Image tool (and drag-and-drop generally) inside Panel mode** — root cause was Tauri intercepting drag-and-drop at the OS level before the page ever saw it, a default Tauri v2 behavior. Disabled for Xuro's main window; confirmed nothing else in the app relied on it.
+- **Switching page themes now actually changes the page** — it previously only affected panels added *after* the switch, leaving the current page looking unchanged. It now recolors the page immediately.
+- Excalidraw's own hamburger menu (which linked to Excalidraw's own Discord/socials/docs) is replaced with a small Xuro-specific menu (GitHub link, background color control). Excalidraw's separate Help ("?") dialog isn't officially customizable, so it's hidden outright rather than left showing the wrong project's links.
+- Made the Inkwell editor's project view remount cleanly on every project switch, as a defensive fix for an unconfirmed report of stray duplicate toolbar rows — we couldn't reproduce this from the description alone; if it recurs, please note exactly what you clicked beforehand so it can be tracked down properly.
+
 ## [0.1.8] — September 12, 2026
 
 Inkwell Panel mode — manga/manhwa page layouts

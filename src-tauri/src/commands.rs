@@ -15,7 +15,7 @@ use crate::manga_online::{
     self, DownloadedChapter, HistoryEntry, MangaBookmarkEntry, MangaFollow, ReadingProgress,
 };
 use crate::manga_source::{self, MangaBrowseParams, MangaChapter, MangaDetails, MangaPage, MangaTag};
-use crate::studio::{self, Chapter, Project, ProjectKind, ProjectSummary};
+use crate::studio::{self, Chapter, ChapterKind, Project, ProjectSummary};
 use crate::search::SearchHit;
 use crate::todos::{self, Todo};
 use crate::vault::{self, TreeNode};
@@ -948,7 +948,7 @@ pub fn studio_get(state: State<'_, AppState>, project_id: String) -> AppResult<P
 pub fn studio_create(
     state: State<'_, AppState>,
     title: String,
-    kind: ProjectKind,
+    kind: ChapterKind,
 ) -> AppResult<Project> {
     studio::create(&state.root()?, &title, kind)
 }
@@ -972,8 +972,9 @@ pub fn studio_add_chapter(
     state: State<'_, AppState>,
     project_id: String,
     title: String,
+    kind: ChapterKind,
 ) -> AppResult<Chapter> {
-    studio::add_chapter(&state.root()?, &project_id, &title)
+    studio::add_chapter(&state.root()?, &project_id, &title, kind)
 }
 
 #[tauri::command]

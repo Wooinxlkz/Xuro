@@ -1,4 +1,4 @@
-import { Excalidraw } from "@excalidraw/excalidraw";
+import { Excalidraw, MainMenu } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type {
   AppState,
@@ -7,6 +7,7 @@ import type {
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import { Github } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "@/lib/utils";
 
@@ -17,6 +18,11 @@ import { cx } from "@/lib/utils";
  * giving a strong starting structure, not locking anyone in. */
 export const PAGE_WIDTH = 850;
 export const PAGE_HEIGHT = 1200;
+
+/** Fixed, well-known id for the page-bounds guide rectangle so a later
+ * theme switch can find and recolor it — every fresh page has exactly one
+ * of these, so a constant id (rather than a random one) is safe. */
+const PAGE_BOUNDS_ID = "xuro-page-bounds";
 
 export type PageTheme = "manga" | "manhwa" | "vanilla";
 
@@ -33,6 +39,7 @@ const THEME_META: Record<PageTheme, { label: string; pageColor: string; stroke: 
  * depending on a specific utility function's exact export name/signature
  * in whatever Excalidraw version happens to be installed. */
 function rectElement(opts: {
+  id?: string;
   x: number;
   y: number;
   width: number;
@@ -43,7 +50,7 @@ function rectElement(opts: {
 }): OrderedExcalidrawElement {
   const now = Date.now();
   return {
-    id: crypto.randomUUID(),
+    id: opts.id ?? crypto.randomUUID(),
     type: "rectangle",
     x: opts.x,
     y: opts.y,
@@ -167,6 +174,7 @@ function parseSaved(raw: string): SavedPage | null {
 
 function pageBoundsElement(theme: PageTheme): OrderedExcalidrawElement {
   return rectElement({
+    id: PAGE_BOUNDS_ID,
     x: 0,
     y: 0,
     width: PAGE_WIDTH,
@@ -188,6 +196,13 @@ export function PanelPageEditor({
   const [pageTheme, setPageTheme] = useState<PageTheme>(saved?.pageTheme ?? "manga");
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Same check CanvasEditor.tsx already uses for the existing Canvas
+  // feature — without passing this through, Excalidraw's own toolbar/menu
+  // chrome defaults to a light theme regardless of Xuro's actual theme,
+  // which is why its icons were unreadable against a dark app background.
+  const isDark =
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark");
 
   const initialData: ExcalidrawInitialDataState = useMemo(() => {
     if (saved) {
@@ -246,11 +261,36 @@ export function PanelPageEditor({
     setPageTheme(theme);
     const api = apiRef.current;
     if (!api) return;
-    persist(api.getSceneElements(), api.getAppState(), api.getFiles(), theme);
+    const meta = THEME_META[theme];
+    const now = Date.now();
+    // Recolor the page-bounds guide rectangle in place — without this,
+    // switching themes only affected *future* inserted panels, leaving
+    // the page looking completely unchanged (the reported "themes do
+    // nothing" bug).
+    const updated = api.getSceneElements().map((el) =>
+      el.id === PAGE_BOUNDS_ID
+        ? ({
+            ...el,
+            strokeColor: meta.stroke,
+            backgroundColor: meta.pageColor,
+            version: el.version + 1,
+            versionNonce: Math.floor(Math.random() * 2 ** 31),
+            updated: now,
+          } as OrderedExcalidrawElement)
+        : el,
+    );
+    api.updateScene({ elements: updated });
+    persist(updated, api.getAppState(), api.getFiles(), theme);
   };
 
   return (
     <div className="flex flex-1 overflow-hidden">
+      {/* Excalidraw's own Help ("?") dialog links to Excalidraw's own
+          docs/blog/issue-tracker/YouTube — there's no supported way to
+          override its contents, so it's hidden outright rather than left
+          showing the wrong project's branding. The MainMenu below (which
+          *is* fully overridable) carries Xuro's own links instead. */}
+      <style>{`.excalidraw button[aria-label="Help"] { display: none !important; }`}</style>
       <div className="min-w-0 flex-1">
         <Excalidraw
           excalidrawAPI={(api) => {
@@ -258,7 +298,21 @@ export function PanelPageEditor({
           }}
           initialData={initialData}
           onChange={handleChange}
-        />
+          theme={isDark ? "dark" : "light"}
+        >
+          <MainMenu>
+            <MainMenu.ItemLink
+              href="https://github.com/Wooinxlkz/Xuro"
+              icon={<Github size={14} strokeWidth={1.8} />}
+            >
+              Xuro on GitHub
+            </MainMenu.ItemLink>
+            <MainMenu.ItemLink href="https://github.com/Wooinxlkz/Xuro#readme">
+              Documentation
+            </MainMenu.ItemLink>
+            <MainMenu.DefaultItems.ChangeCanvasBackground />
+          </MainMenu>
+        </Excalidraw>
       </div>
 
       <div className="flex w-[220px] shrink-0 flex-col gap-4 overflow-auto border-l border-line-soft bg-panel p-3">

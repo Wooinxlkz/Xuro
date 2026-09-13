@@ -33,7 +33,7 @@ import type {
   SearchHit,
   StudioChapter,
   StudioProject,
-  StudioProjectKind,
+  ChapterKind,
   StudioProjectSummary,
   Snippet,
   TagEntry,
@@ -307,13 +307,13 @@ export const ipc = {
   // ---- Inkwell (writing studio) ----
   studioList: () => call<StudioProjectSummary[]>("studio_list"),
   studioGet: (projectId: string) => call<StudioProject>("studio_get", { projectId }),
-  studioCreate: (title: string, kind: StudioProjectKind) =>
+  studioCreate: (title: string, kind: ChapterKind) =>
     call<StudioProject>("studio_create", { title, kind }),
   studioRename: (projectId: string, title: string) =>
     call<StudioProjectSummary>("studio_rename", { projectId, title }),
   studioDelete: (projectId: string) => call<void>("studio_delete", { projectId }),
-  studioAddChapter: (projectId: string, title: string) =>
-    call<StudioChapter>("studio_add_chapter", { projectId, title }),
+  studioAddChapter: (projectId: string, title: string, kind: ChapterKind) =>
+    call<StudioChapter>("studio_add_chapter", { projectId, title, kind }),
   studioUpdateChapter: (
     projectId: string,
     chapterId: string,

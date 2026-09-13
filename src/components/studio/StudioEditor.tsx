@@ -4,10 +4,12 @@ import {
   ArrowUp,
   Bold,
   Download,
+  Feather,
   FileDown,
   Heading1,
   Heading2,
   Italic,
+  Layers,
   List,
   ListOrdered,
   Loader2,
@@ -28,12 +30,12 @@ import StarterKit from "@tiptap/starter-kit";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
-import type { StudioChapter } from "@/lib/types";
+import type { ChapterKind, StudioChapter } from "@/lib/types";
 import { cx } from "@/lib/utils";
 import { useStudio } from "@/stores/studio";
 
 // Excalidraw is a heavy bundle — same lazy-loading treatment AppShell
-// already gives the Canvas feature, so opening Inkwell (or a Prose
+// already gives the Canvas feature, so opening Inkwell (or a Prose-only
 // project) never pays for it.
 const PanelPageEditor = lazy(() =>
   import("./PanelPageEditor").then((m) => ({ default: m.PanelPageEditor })),
@@ -41,11 +43,13 @@ const PanelPageEditor = lazy(() =>
 
 type ExportFormat = "md" | "txt" | "pdf" | "png";
 
-/** Inkwell's editor shell: a chapter/page list on the left (labeled
- * "Chapters" for Prose projects, "Pages" for Panel projects — same list,
- * same reorder/delete/rename commands either way, since both kinds share
- * one backend model), and either a Tiptap prose editor or an Excalidraw
- * panel-layout canvas on the right, depending on the project's kind. */
+const KIND_ICON: Record<ChapterKind, typeof Feather> = { prose: Feather, panel: Layers };
+
+/** Inkwell's editor shell: a chapter/page list on the left — every item
+ * has its own kind (Prose or Panel), shown with a small icon, so one
+ * project can freely mix a Tiptap chapter next to an Excalidraw page —
+ * and either a Tiptap prose editor or an Excalidraw panel-layout canvas
+ * on the right, depending on whichever item is currently selected. */
 export function StudioEditor({ onClose }: { onClose: () => void }) {
   const project = useStudio((s) => s.activeProject);
   const activeChapterId = useStudio((s) => s.activeChapterId);
@@ -60,10 +64,11 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
   const panelContainerRef = useRef<HTMLDivElement>(null);
 
   if (!project) return null;
-  const isPanel = project.kind === "panel";
-  const unit = isPanel ? "page" : "chapter";
   const chapter = project.chapters.find((c) => c.id === activeChapterId) ?? project.chapters[0];
-  const totalWords = project.chapters.reduce((sum, c) => sum + c.wordCount, 0);
+  const isPanel = chapter?.kind === "panel";
+  const proseChapters = project.chapters.filter((c) => c.kind === "prose");
+  const panelChapters = project.chapters.filter((c) => c.kind === "panel");
+  const totalWords = proseChapters.reduce((sum, c) => sum + c.wordCount, 0);
 
   const moveChapter = (index: number, direction: -1 | 1) => {
     const target = index + direction;
@@ -87,28 +92,26 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
     if (saved) toast.success("Exported");
   };
 
-  /** Multi-page PDF for Panel projects: flips through every page in the
-   * (already-mounted, already-working) editor one at a time, screenshots
-   * each with the exact same `.toCanvas()` step the single-page PNG export
-   * already uses, then assembles the captured images into one PDF using
-   * html2pdf.js's own documented page-break convention (a
-   * `html2pdf__page-break` element between sections, `pagebreak: {mode:
-   * ["css"]}`) — no PDF-manipulation library needed, no merging separate
-   * PDF byte buffers by hand. The page-flipping needs a short settle delay
-   * per page for Excalidraw to remount and paint before capturing; that
-   * delay is the one part of this that can't be verified without actually
-   * running it. */
+  /** Multi-page PDF for the project's Panel pages only (a mixed project's
+   * Prose chapters aren't visual, so they don't belong in this export) —
+   * flips through each Panel page in the already-mounted editor one at a
+   * time, screenshots it with the same `.toCanvas()` step the single-page
+   * PNG export uses, then assembles the images into one PDF via
+   * html2pdf.js's documented `html2pdf__page-break` convention. The
+   * page-flip settle delay is a fixed timeout, not an actual
+   * "finished painting" signal — the one part of this that can't be
+   * verified without actually running it. */
   const exportPanelPdf = async () => {
     const container = panelContainerRef.current;
-    if (!container || project.chapters.length === 0) return;
+    if (!container || panelChapters.length === 0) return;
     const originalChapterId = activeChapterId ?? project.chapters[0]?.id ?? null;
     const html2pdf = (await import("html2pdf.js")).default;
 
     const images: string[] = [];
     try {
-      for (let i = 0; i < project.chapters.length; i++) {
-        const c = project.chapters[i];
-        toast.info(`Capturing page ${i + 1} of ${project.chapters.length}…`, {
+      for (let i = 0; i < panelChapters.length; i++) {
+        const c = panelChapters[i];
+        toast.info(`Capturing page ${i + 1} of ${panelChapters.length}…`, {
           id: "inkwell-panel-pdf-export",
         });
         selectChapter(c.id);
@@ -183,7 +186,7 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
         title.textContent = project.title;
         title.style.cssText = "font-size:28px;font-weight:700;margin:0 0 32px;";
         wrapper.appendChild(title);
-        for (const c of project.chapters) {
+        for (const c of proseChapters) {
           const heading = document.createElement("h2");
           heading.textContent = c.title;
           heading.style.cssText = "font-size:19px;font-weight:600;margin:32px 0 12px;";
@@ -215,8 +218,8 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
       } else {
         const text =
           format === "md"
-            ? project.chapters.map((c) => `# ${c.title}\n\n${c.content}`).join("\n\n---\n\n")
-            : project.chapters.map((c) => `${c.title}\n\n${stripMarkdown(c.content)}`).join("\n\n\n");
+            ? proseChapters.map((c) => `# ${c.title}\n\n${c.content}`).join("\n\n---\n\n")
+            : proseChapters.map((c) => `${c.title}\n\n${stripMarkdown(c.content)}`).join("\n\n\n");
         const { ipc } = await import("@/lib/ipc");
         const saved = await ipc.studioExportText(project.title, format, text);
         if (saved) toast.success("Exported");
@@ -228,8 +231,23 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const summaryLine = () => {
+    const parts: string[] = [];
+    if (proseChapters.length > 0) {
+      parts.push(`${proseChapters.length} chapter${proseChapters.length === 1 ? "" : "s"}`);
+    }
+    if (panelChapters.length > 0) {
+      parts.push(`${panelChapters.length} page${panelChapters.length === 1 ? "" : "s"}`);
+    }
+    if (totalWords > 0) parts.push(`${totalWords.toLocaleString()} words`);
+    return parts.join(" · ") || "Empty project";
+  };
+
   return (
-    <div className="flex h-full">
+    // Keyed by project id: switching between projects always gets a
+    // fully clean remount of the whole editor tree, so nothing from a
+    // previous project's render can ever linger.
+    <div key={project.id} className="flex h-full">
       <div className="flex w-[240px] shrink-0 flex-col border-r border-line-soft bg-panel">
         <div className="flex items-center gap-1.5 border-b border-line-soft px-3 py-2.5">
           <button
@@ -252,64 +270,76 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex-1 overflow-auto p-1.5">
-          {project.chapters.map((c, i) => (
-            <div
-              key={c.id}
-              className={cx(
-                "group flex items-center gap-1 rounded-md px-2 py-1.5",
-                c.id === chapter?.id ? "bg-active" : "hover:bg-hover",
-              )}
-            >
-              <button
-                type="button"
-                onClick={() => selectChapter(c.id)}
-                className="min-w-0 flex-1 truncate text-left text-[12.5px] text-ink"
+          {project.chapters.map((c, i) => {
+            const ItemIcon = KIND_ICON[c.kind];
+            return (
+              <div
+                key={c.id}
+                className={cx(
+                  "group flex items-center gap-1.5 rounded-md px-2 py-1.5",
+                  c.id === chapter?.id ? "bg-active" : "hover:bg-hover",
+                )}
               >
-                {c.title || `Untitled ${unit}`}
-              </button>
-              <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                <ItemIcon size={11} strokeWidth={1.8} className="shrink-0 text-faint" />
                 <button
                   type="button"
-                  onClick={() => moveChapter(i, -1)}
-                  disabled={i === 0}
-                  className="grid h-5 w-5 place-items-center rounded text-faint hover:text-ink disabled:opacity-30"
+                  onClick={() => selectChapter(c.id)}
+                  className="min-w-0 flex-1 truncate text-left text-[12.5px] text-ink"
                 >
-                  <ArrowUp size={11} strokeWidth={2} />
+                  {c.title || (c.kind === "panel" ? "Untitled page" : "Untitled chapter")}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => moveChapter(i, 1)}
-                  disabled={i === project.chapters.length - 1}
-                  className="grid h-5 w-5 place-items-center rounded text-faint hover:text-ink disabled:opacity-30"
-                >
-                  <ArrowDown size={11} strokeWidth={2} />
-                </button>
-                {project.chapters.length > 1 && (
+                <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
                   <button
                     type="button"
-                    onClick={() => void deleteChapter(c.id)}
-                    className="grid h-5 w-5 place-items-center rounded text-faint hover:text-danger"
+                    onClick={() => moveChapter(i, -1)}
+                    disabled={i === 0}
+                    className="grid h-5 w-5 place-items-center rounded text-faint hover:text-ink disabled:opacity-30"
                   >
-                    <Trash2 size={11} strokeWidth={2} />
+                    <ArrowUp size={11} strokeWidth={2} />
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => moveChapter(i, 1)}
+                    disabled={i === project.chapters.length - 1}
+                    className="grid h-5 w-5 place-items-center rounded text-faint hover:text-ink disabled:opacity-30"
+                  >
+                    <ArrowDown size={11} strokeWidth={2} />
+                  </button>
+                  {project.chapters.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => void deleteChapter(c.id)}
+                      className="grid h-5 w-5 place-items-center rounded text-faint hover:text-danger"
+                    >
+                      <Trash2 size={11} strokeWidth={2} />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => void addChapter()}
-            className="mt-1 flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-faint hover:bg-hover hover:text-ink"
-          >
-            <Plus size={12} strokeWidth={2} />
-            Add {unit}
-          </button>
+            );
+          })}
+          <div className="mt-1 flex gap-1">
+            <button
+              type="button"
+              onClick={() => void addChapter("prose")}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11.5px] text-faint hover:bg-hover hover:text-ink"
+            >
+              <Plus size={11} strokeWidth={2} />
+              Chapter
+            </button>
+            <button
+              type="button"
+              onClick={() => void addChapter("panel")}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[11.5px] text-faint hover:bg-hover hover:text-ink"
+            >
+              <Plus size={11} strokeWidth={2} />
+              Page
+            </button>
+          </div>
         </div>
 
         <div className="border-t border-line-soft px-3 py-2 text-[10.5px] text-faint">
-          {isPanel
-            ? `${project.chapters.length} page${project.chapters.length === 1 ? "" : "s"}`
-            : `${totalWords.toLocaleString()} words total`}
+          {summaryLine()}
         </div>
       </div>
 
@@ -326,7 +356,7 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
         )}
         {!chapter ? (
           <div className="flex flex-1 items-center justify-center text-[12.5px] text-faint">
-            Add a {unit} to get started.
+            Add a chapter or page to get started.
           </div>
         ) : isPanel ? (
           <div ref={panelContainerRef} className="flex flex-1 overflow-hidden">
@@ -371,12 +401,12 @@ function ChapterToolbar({
   const options: Array<{ key: ExportFormat; label: string }> = isPanel
     ? [
         { key: "png", label: "PNG (current page)" },
-        { key: "pdf", label: "PDF (all pages)" },
+        { key: "pdf", label: "PDF (all Panel pages)" },
       ]
     : [
         { key: "md", label: "Markdown (.md)" },
         { key: "txt", label: "Plain text (.txt)" },
-        { key: "pdf", label: "PDF (whole project)" },
+        { key: "pdf", label: "PDF (all Prose chapters)" },
       ];
   return (
     <div className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-2">
@@ -399,7 +429,7 @@ function ChapterToolbar({
           Export
         </Button>
         {exportOpen && (
-          <div className="absolute right-0 z-10 mt-1 min-w-[160px] rounded-lg border border-line-soft bg-panel p-1 shadow-md shadow-black/10">
+          <div className="absolute right-0 z-10 mt-1 min-w-[180px] rounded-lg border border-line-soft bg-panel p-1 shadow-md shadow-black/10">
             {options.map((opt) => (
               <button
                 key={opt.key}
