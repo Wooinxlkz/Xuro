@@ -7,7 +7,7 @@ import type {
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import { Github } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "@/lib/utils";
 
@@ -303,7 +303,7 @@ export function PanelPageEditor({
           <MainMenu>
             <MainMenu.ItemLink
               href="https://github.com/Wooinxlkz/Xuro"
-              icon={<Github size={14} strokeWidth={1.8} />}
+              icon={<ExternalLink size={14} strokeWidth={1.8} />}
             >
               Xuro on GitHub
             </MainMenu.ItemLink>
