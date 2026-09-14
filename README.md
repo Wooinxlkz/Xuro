@@ -39,7 +39,7 @@ On top of that, it's fast. Every action — opening a note, searching, switching
 - **Personalized appearance** — light, dark, or system theme (with a one-click toggle right in the sidebar), an optional accent color that touches the caret, selection, tabs, and active navigation, and a choice of six background tints (Default, Cream, Soft, Mossy Hollow, Chocolate Truffle, Ink Wash) — all opt-in, all reversible to the default monochrome look in one click.
 - **System tray icon** — right-click for your pinned notes plus Open/Exit, left-click to bring Xuro to the front.
 - **PIN locks** — protect any note or folder with a PIN from the right-click menu. Locked content is hidden everywhere in the app, including search, until unlocked; a forgotten PIN can be reset from Settings.
-- **Daily Notes, Tags, Kanban, Snippets** — a calendar for daily notes, a browser for inline `#tags`, multiple drag-and-drop Kanban boards (create as many as you need, rename each one inline), and a searchable, syntax-highlighted page for reusable text/code snippets — HTML, CSS, and JavaScript snippets get a one-click, sandboxed live Preview right in the card, with p5.js bundled in for sketches.
+- **Daily Notes, Tags, Kanban** — a calendar for daily notes, a browser for inline `#tags`, and multiple drag-and-drop Kanban boards (create as many as you need, rename each one inline).
 - **Note Templates** — reusable starting content for new notes, with `{{title}}`, `{{date}}`, and `{{time}}` placeholders filled in automatically.
 - **LaTeX/math rendering** — inline `$math$` and block `$$math$$` render live via KaTeX, stored as plain text in your Markdown, no proprietary format.
 - **Export to PDF** — exports the note exactly as shown in the editor, math and tables and images included.

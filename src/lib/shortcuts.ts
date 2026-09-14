@@ -9,7 +9,6 @@ export type ShortcutAction =
   | "openDailyNotes"
   | "openTags"
   | "openKanban"
-  | "openSnippets"
   | "focusSidebarEditor"
   | "toggleSidebar"
   | "toggleZenMode"
@@ -41,7 +40,6 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: "openDailyNotes", label: "Open Daily Notes" },
   { id: "openTags", label: "Open Tags" },
   { id: "openKanban", label: "Open Kanban" },
-  { id: "openSnippets", label: "Open Snippets" },
   { id: "focusSidebarEditor", label: "Focus sidebar or editor" },
   { id: "toggleSidebar", label: "Toggle sidebar" },
   { id: "toggleZenMode", label: "Toggle Zen mode" },
@@ -68,7 +66,6 @@ export function defaultShortcutBindings(
     openDailyNotes: { ...mod, shift: true, key: "c" },
     openTags: { ...mod, shift: true, key: "g" },
     openKanban: { ...mod, shift: true, key: "k" },
-    openSnippets: { ...mod, shift: true, key: "s" },
     focusSidebarEditor: { ...mod, shift: true, key: "e" },
     toggleSidebar: { ...mod, key: "\\" },
     toggleZenMode: { ...mod, shift: true, key: "z" },

@@ -21,7 +21,7 @@ use crate::todos::{self, Todo};
 use crate::vault::{self, TreeNode};
 use crate::{
     agent_docs, assets, canvas, cloud, cloud_metadata, daily_notes, graph, link_meta, locks,
-    notes, obsidian_import, pins, quick_capture, search, snippets, tags, templates, tray,
+    notes, obsidian_import, pins, quick_capture, search, tags, templates, tray,
 };
 
 #[derive(Default)]
@@ -286,39 +286,6 @@ pub fn search_notes(
 #[tauri::command]
 pub fn list_tags(state: State<'_, AppState>) -> AppResult<Vec<tags::TagEntry>> {
     tags::list_tags(&state.root()?)
-}
-
-// ---- snippets ----
-
-#[tauri::command]
-pub fn snippets_list(state: State<'_, AppState>) -> AppResult<Vec<snippets::Snippet>> {
-    snippets::list(&state.root()?)
-}
-
-#[tauri::command]
-pub fn snippet_add(
-    state: State<'_, AppState>,
-    title: String,
-    language: String,
-    content: String,
-) -> AppResult<snippets::Snippet> {
-    snippets::add(&state.root()?, &title, &language, &content)
-}
-
-#[tauri::command]
-pub fn snippet_update(
-    state: State<'_, AppState>,
-    id: String,
-    title: String,
-    language: String,
-    content: String,
-) -> AppResult<snippets::Snippet> {
-    snippets::update(&state.root()?, &id, &title, &language, &content)
-}
-
-#[tauri::command]
-pub fn snippet_delete(state: State<'_, AppState>, id: String) -> AppResult<()> {
-    snippets::delete(&state.root()?, &id)
 }
 
 // ---- templates ----

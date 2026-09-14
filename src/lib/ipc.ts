@@ -35,7 +35,6 @@ import type {
   StudioProject,
   ChapterKind,
   StudioProjectSummary,
-  Snippet,
   TagEntry,
   Template,
   Theme,
@@ -99,12 +98,6 @@ export const ipc = {
   searchNotes: (query: string, limit?: number) =>
     call<SearchHit[]>("search_notes", { query, limit }),
   listTags: () => call<TagEntry[]>("list_tags"),
-  snippetsList: () => call<Snippet[]>("snippets_list"),
-  snippetAdd: (title: string, language: string, content: string) =>
-    call<Snippet>("snippet_add", { title, language, content }),
-  snippetUpdate: (id: string, title: string, language: string, content: string) =>
-    call<Snippet>("snippet_update", { id, title, language, content }),
-  snippetDelete: (id: string) => call<void>("snippet_delete", { id }),
   templatesList: () => call<Template[]>("templates_list"),
   templateAdd: (title: string, content: string) =>
     call<Template>("template_add", { title, content }),

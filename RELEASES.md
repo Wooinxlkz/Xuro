@@ -2,6 +2,24 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
+## [0.2.0] — September 13, 2026
+
+Snippets removed; Inkwell's Panel mode now matches Xuro's own look
+
+### Removed
+
+- **Snippets** has been removed entirely — the page, its store, its backend storage, and every menu/shortcut/command-palette entry that opened it.
+
+### Changed
+
+- **Panel mode's Excalidraw toolbar now matches Xuro's own colors** instead of Excalidraw's default purple — the active-tool highlight uses the same monochrome look as the rest of the app's active/pressed buttons.
+- **Excalidraw's hamburger menu is rebuilt properly this time**: kept the genuinely useful native tools (Save as image, Export, Clear canvas, Change background) that got accidentally stripped out along with the branding last version, and replaced only the items that linked to Excalidraw's own docs/socials with Xuro's own GitHub link.
+- **Added a canvas theme-toggle button** next to where Excalidraw's Help button was, via Excalidraw's `Footer` slot — lets the canvas chrome be flipped independently of Xuro's own app theme if you want it a different shade.
+
+### Investigating
+
+- A report of stray duplicate toolbar rows appearing in Inkwell when switching between chapters — still not confirmed reproducible from the description alone, but the pattern is consistent with a known class of WebView2 rendering glitch. Applied a defensive fix (the chapter toolbar and body now tear down and rebuild together as a single unit on every switch, instead of separately) that may resolve it, but this isn't confirmed as the actual root cause. If it happens again, the most useful thing to report is the exact sequence of chapters/pages clicked beforehand.
+
 ## [0.1.9] — September 12, 2026
 
 Inkwell fixes: mixed projects, dark theme, image tool, and Excalidraw's default menu

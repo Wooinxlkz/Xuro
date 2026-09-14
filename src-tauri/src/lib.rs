@@ -25,7 +25,6 @@ mod obsidian_import;
 mod pins;
 mod quick_capture;
 mod search;
-mod snippets;
 mod studio;
 mod tags;
 mod templates;
@@ -145,10 +144,6 @@ pub fn run() {
             commands::delete_entry,
             commands::search_notes,
             commands::list_tags,
-            commands::snippets_list,
-            commands::snippet_add,
-            commands::snippet_update,
-            commands::snippet_delete,
             commands::templates_list,
             commands::template_add,
             commands::template_update,

@@ -2,7 +2,6 @@ import {
   Bookmark,
   CalendarDays,
   CheckSquare,
-  Code2,
   Feather,
   FilePlus,
   FileText,
@@ -175,13 +174,6 @@ export function CommandPalette() {
         hint: formatShortcutText(shortcuts.openKanban, mac),
         icon: KanbanIcon,
         run: () => vault.setView({ type: "kanban" }),
-      },
-      {
-        id: "snippets",
-        label: "Open Snippets",
-        hint: formatShortcutText(shortcuts.openSnippets, mac),
-        icon: Code2,
-        run: () => vault.setView({ type: "snippets" }),
       },
       {
         id: "templates",

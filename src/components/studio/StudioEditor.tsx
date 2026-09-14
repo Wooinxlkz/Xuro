@@ -343,10 +343,15 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* Keyed as one atomic block (toolbar + body together) rather than
+          two independently-keyed siblings — switching chapters swaps this
+          whole subtree in one commit instead of reconciling the toolbar
+          and body separately, which is a safer shape against any
+          rendering/compositing staleness than two separate keyed
+          elements sharing a parent. */}
+      <div key={chapter?.id ?? "empty"} className="flex min-w-0 flex-1 flex-col">
         {chapter && (
           <ChapterToolbar
-            key={chapter.id}
             chapter={chapter}
             isPanel={isPanel}
             exporting={exporting}
@@ -369,14 +374,13 @@ export function StudioEditor({ onClose }: { onClose: () => void }) {
               }
             >
               <PanelPageEditor
-                key={chapter.id}
                 content={chapter.content}
                 onChange={(content) => void updateChapter(chapter.id, chapter.title, content, 0)}
               />
             </Suspense>
           </div>
         ) : (
-          <ChapterBody key={chapter.id} chapter={chapter} />
+          <ChapterBody chapter={chapter} />
         )}
       </div>
     </div>

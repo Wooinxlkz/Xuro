@@ -1,4 +1,4 @@
-import { Excalidraw, MainMenu } from "@excalidraw/excalidraw";
+import { Excalidraw, Footer, MainMenu } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type {
   AppState,
@@ -7,7 +7,7 @@ import type {
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Moon, Sun } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "@/lib/utils";
 
@@ -197,12 +197,14 @@ export function PanelPageEditor({
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Same check CanvasEditor.tsx already uses for the existing Canvas
-  // feature — without passing this through, Excalidraw's own toolbar/menu
-  // chrome defaults to a light theme regardless of Xuro's actual theme,
-  // which is why its icons were unreadable against a dark app background.
-  const isDark =
+  // Excalidraw's own toolbar/menu chrome follows Xuro's theme by default
+  // (same check CanvasEditor.tsx uses), but can be flipped independently
+  // via the footer toggle below — some people want a different shade for
+  // the canvas chrome than the rest of the app.
+  const appIsDark =
     typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+  const [uiThemeOverride, setUiThemeOverride] = useState<"light" | "dark" | null>(null);
+  const uiTheme = uiThemeOverride ?? (appIsDark ? "dark" : "light");
 
   const initialData: ExcalidrawInitialDataState = useMemo(() => {
     if (saved) {
@@ -289,18 +291,41 @@ export function PanelPageEditor({
           docs/blog/issue-tracker/YouTube — there's no supported way to
           override its contents, so it's hidden outright rather than left
           showing the wrong project's branding. The MainMenu below (which
-          *is* fully overridable) carries Xuro's own links instead. */}
-      <style>{`.excalidraw button[aria-label="Help"] { display: none !important; }`}</style>
-      <div className="min-w-0 flex-1">
+          *is* fully overridable) carries Xuro's own links instead.
+          The --color-primary override matches Excalidraw's active-tool
+          highlight to Xuro's own monochrome "primary button" look
+          (bg-invert/text-invert-ink) instead of Excalidraw's default
+          purple, which clashed with the rest of the app. */}
+      <style>{`
+        .xuro-panel-editor .excalidraw button[aria-label="Help"] { display: none !important; }
+        .xuro-panel-editor .excalidraw {
+          --color-primary: var(--invert);
+          --color-primary-darker: var(--invert);
+          --color-primary-darkest: var(--invert);
+          --color-primary-light: var(--active);
+        }
+        .xuro-panel-editor .excalidraw.theme--dark {
+          --color-primary: var(--invert);
+          --color-primary-darker: var(--invert);
+          --color-primary-darkest: var(--invert);
+          --color-primary-light: var(--active);
+        }
+      `}</style>
+      <div className="xuro-panel-editor min-w-0 flex-1">
         <Excalidraw
           excalidrawAPI={(api) => {
             apiRef.current = api;
           }}
           initialData={initialData}
           onChange={handleChange}
-          theme={isDark ? "dark" : "light"}
+          theme={uiTheme}
         >
           <MainMenu>
+            <MainMenu.DefaultItems.SaveAsImage />
+            <MainMenu.DefaultItems.Export />
+            <MainMenu.DefaultItems.ClearCanvas />
+            <MainMenu.DefaultItems.ChangeCanvasBackground />
+            <MainMenu.Separator />
             <MainMenu.ItemLink
               href="https://github.com/Wooinxlkz/Xuro"
               icon={<ExternalLink size={14} strokeWidth={1.8} />}
@@ -310,8 +335,21 @@ export function PanelPageEditor({
             <MainMenu.ItemLink href="https://github.com/Wooinxlkz/Xuro#readme">
               Documentation
             </MainMenu.ItemLink>
-            <MainMenu.DefaultItems.ChangeCanvasBackground />
           </MainMenu>
+          <Footer>
+            <button
+              type="button"
+              onClick={() => setUiThemeOverride(uiTheme === "dark" ? "light" : "dark")}
+              title={uiTheme === "dark" ? "Switch canvas to light" : "Switch canvas to dark"}
+              className="mx-2 grid h-9 w-9 place-items-center rounded-lg border border-line-soft bg-panel text-faint hover:bg-hover hover:text-ink"
+            >
+              {uiTheme === "dark" ? (
+                <Sun size={15} strokeWidth={1.8} />
+              ) : (
+                <Moon size={15} strokeWidth={1.8} />
+              )}
+            </button>
+          </Footer>
         </Excalidraw>
       </div>
 

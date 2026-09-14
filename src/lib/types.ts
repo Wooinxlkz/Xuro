@@ -85,14 +85,6 @@ export interface TagEntry {
   notes: TaggedNote[];
 }
 
-export interface Snippet {
-  id: string;
-  title: string;
-  language: string;
-  content: string;
-  createdAt: number;
-}
-
 export interface Template {
   id: string;
   title: string;
@@ -199,7 +191,6 @@ export type View =
   | { type: "daily" }
   | { type: "tags" }
   | { type: "kanban" }
-  | { type: "snippets" }
   | { type: "templates" }
   | { type: "graph" }
   | { type: "library" }

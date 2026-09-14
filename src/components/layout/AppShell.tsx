@@ -35,7 +35,6 @@ import { TodosPage } from "@/components/todos/TodosPage";
 import { DailyNotesPage } from "@/components/daily/DailyNotesPage";
 import { TagsPage } from "@/components/tags/TagsPage";
 import { KanbanPage } from "@/components/kanban/KanbanPage";
-import { SnippetsPage } from "@/components/snippets/SnippetsPage";
 import { TemplatesPage } from "@/components/templates/TemplatesPage";
 import { GraphView } from "@/components/graph/GraphView";
 import { LibraryPage } from "@/components/library/LibraryPage";
@@ -220,15 +219,13 @@ export function AppShell() {
                       ? "Tags"
                       : view?.type === "kanban"
                         ? "Kanban"
-                        : view?.type === "snippets"
-                          ? "Snippets"
-                          : view?.type === "templates"
-                            ? "Templates"
-                            : view?.type === "graph"
-                              ? "Graph"
-                              : view?.type === "library"
-                                ? "Library"
-                                : view?.type === "studio"
+                        : view?.type === "templates"
+                          ? "Templates"
+                          : view?.type === "graph"
+                            ? "Graph"
+                            : view?.type === "library"
+                              ? "Library"
+                              : view?.type === "studio"
                                   ? "Inkwell"
                                   : ""}
             </ActionSwapText>
@@ -507,11 +504,6 @@ export function AppShell() {
           {view?.type === "kanban" && (
             <div className="absolute inset-0">
               <KanbanPage />
-            </div>
-          )}
-          {view?.type === "snippets" && (
-            <div className="absolute inset-0">
-              <SnippetsPage />
             </div>
           )}
           {view?.type === "templates" && (

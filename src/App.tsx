@@ -144,9 +144,6 @@ export default function App() {
       } else if (matchesShortcut(event, shortcuts.openKanban) && vault.status === "ready") {
         event.preventDefault();
         vault.setView({ type: "kanban" });
-      } else if (matchesShortcut(event, shortcuts.openSnippets) && vault.status === "ready") {
-        event.preventDefault();
-        vault.setView({ type: "snippets" });
       } else if (matchesShortcut(event, shortcuts.focusSidebarEditor)) {
         event.preventDefault();
         toggleSidebarEditorFocus();

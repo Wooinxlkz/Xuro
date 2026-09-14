@@ -1,7 +1,7 @@
 //! Note templates — reusable starting content for new notes (meeting notes,
 //! project briefs, etc.), the same idea as Notion's page templates. Stored
-//! the same way Snippets are: a flat JSON file in the vault's data dir, no
-//! folder structure of their own.
+//! as a flat JSON file in the vault's data dir, no folder structure of
+//! their own.
 
 use std::fs;
 use std::path::{Path, PathBuf};

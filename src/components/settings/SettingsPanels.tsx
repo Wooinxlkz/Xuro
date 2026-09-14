@@ -676,7 +676,7 @@ const DOWNLOAD_URL = "https://github.com/Wooinxlkz/Xuro/releases/latest";
 const FEATURES = [
   "Plain markdown files on your disk — no proprietary format, no lock-in",
   "PIN locks for private notes and folders",
-  "Daily Notes, Tags, Kanban board, and Snippets",
+  "Daily Notes, Tags, and a Kanban board",
   "A real Excalidraw canvas, saved as a normal .excalidraw file",
   "Quick Capture from anywhere with a global shortcut",
   "Backlinks, full-text search, and a command palette",

@@ -4,7 +4,6 @@ import {
   Bookmark,
   CalendarDays,
   CheckSquare,
-  Code2,
   Command,
   FilePlus,
   Feather,
@@ -112,13 +111,6 @@ export function Sidebar() {
           label="Kanban"
           shortcut={shortcuts.openKanban}
           onClick={() => setView({ type: "kanban" })}
-        />
-        <PageLink
-          active={view?.type === "snippets"}
-          icon={<Code2 size={15} strokeWidth={1.75} />}
-          label="Snippets"
-          shortcut={shortcuts.openSnippets}
-          onClick={() => setView({ type: "snippets" })}
         />
         <PageLink
           active={view?.type === "templates"}
