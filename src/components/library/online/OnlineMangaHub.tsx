@@ -432,6 +432,7 @@ export function DownloadsSection() {
               publishAt: null,
               scanlationGroup: null,
               external: false,
+              externalUrl: null,
             }))}
           startChapterId={readingChapter.chapterId}
           onClose={() => setReadingChapter(null)}
