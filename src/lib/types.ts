@@ -196,7 +196,7 @@ export type View =
   | { type: "library" }
   | { type: "studio" };
 
-export type LibraryKind = "book" | "manga";
+export type LibraryKind = "book" | "novel" | "manga";
 
 export interface LibraryItem {
   id: string;
@@ -222,13 +222,14 @@ export interface LibrarySearchResult {
 
 // ---- Online Manga ----
 
-export type MangaLanguage = "english" | "spanish" | "arabic" | "japanese";
+export type MangaLanguage = "english" | "spanish" | "arabic" | "japanese" | "german";
 
 export const MANGA_LANGUAGES: { value: MangaLanguage; label: string }[] = [
   { value: "english", label: "English" },
   { value: "spanish", label: "Spanish" },
   { value: "arabic", label: "Arabic" },
   { value: "japanese", label: "Japanese" },
+  { value: "german", label: "German" },
 ];
 
 export type MangaSort = "latest" | "popular" | "newest" | "titleAsc" | "rating";
@@ -276,6 +277,7 @@ export interface MangaChapter {
   publishAt: string | null;
   scanlationGroup: string | null;
   external: boolean;
+  externalUrl: string | null;
 }
 
 export interface ChapterPages {

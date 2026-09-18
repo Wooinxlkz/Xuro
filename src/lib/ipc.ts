@@ -178,8 +178,8 @@ export const ipc = {
   boardDelete: (id: string) => call<Board[]>("board_delete", { id }),
 
   libraryList: () => call<LibraryItem[]>("library_list"),
-  librarySearchBooks: (query: string) =>
-    call<LibrarySearchResult[]>("library_search_books", { query }),
+  librarySearchBooks: (query: string, kind: LibraryKind) =>
+    call<LibrarySearchResult[]>("library_search_books", { query, kind }),
   librarySearchManga: (query: string) =>
     call<LibrarySearchResult[]>("library_search_manga", { query }),
   libraryAddFromSearch: (result: LibrarySearchResult) =>

@@ -46,6 +46,7 @@ const BLOCKED_BOOK_SUBJECTS: &[&str] = &["erotica", "erotic fiction", "pornograp
 #[serde(rename_all = "lowercase")]
 pub enum LibraryKind {
     Book,
+    Novel,
     Manga,
 }
 
@@ -93,14 +94,15 @@ async fn fetch_json_with_retry<T: for<'de> Deserialize<'de>>(
 ) -> AppResult<T> {
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(12))
-        .user_agent("Xuro/0.1.6")
+        .user_agent("Xuro/0.2.1")
         .build()
         .map_err(|error| AppError::Network(error.to_string()))?;
 
     let mut last_error = None;
-    for attempt in 0..2 {
+    for attempt in 0u32..3 {
         if attempt > 0 {
-            tokio::time::sleep(Duration::from_millis(600)).await;
+            let backoff_ms = 600u64 * 2u64.pow(attempt - 1); // 600ms, then 1200ms
+            tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
         }
         match http.get(url).send().await {
             Ok(response) => {
@@ -337,7 +339,10 @@ struct OpenLibraryDoc {
     subject: Vec<String>,
 }
 
-pub async fn search_books(query: &str) -> AppResult<Vec<LibrarySearchResult>> {
+/// Both Book and Novel entries come from the same Open Library catalog —
+/// `kind` only controls how the result gets tagged/filed once added,
+/// letting "Novels" be its own section without needing a second catalog.
+pub async fn search_books(query: &str, kind: LibraryKind) -> AppResult<Vec<LibrarySearchResult>> {
     let query = query.trim();
     if query.is_empty() {
         return Ok(Vec::new());
@@ -356,7 +361,7 @@ pub async fn search_books(query: &str) -> AppResult<Vec<LibrarySearchResult>> {
             external_id: doc.key,
             title: doc.title,
             author: doc.author_name.first().cloned(),
-            kind: LibraryKind::Book,
+            kind,
             cover_url: doc
                 .cover_i
                 .map(|id| format!("https://covers.openlibrary.org/b/id/{id}-M.jpg")),

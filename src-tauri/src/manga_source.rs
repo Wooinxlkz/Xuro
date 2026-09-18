@@ -33,6 +33,7 @@ pub enum MangaLanguage {
     Spanish,
     Arabic,
     Japanese,
+    German,
 }
 
 impl MangaLanguage {
@@ -45,6 +46,7 @@ impl MangaLanguage {
             MangaLanguage::Spanish => &["es", "es-la"],
             MangaLanguage::Arabic => &["ar"],
             MangaLanguage::Japanese => &["ja"],
+            MangaLanguage::German => &["de"],
         }
     }
 
@@ -54,6 +56,7 @@ impl MangaLanguage {
             MangaLanguage::Spanish => "Spanish",
             MangaLanguage::Arabic => "Arabic",
             MangaLanguage::Japanese => "Japanese",
+            MangaLanguage::German => "German",
         }
     }
 }
@@ -146,9 +149,10 @@ pub struct MangaChapter {
     pub publish_at: Option<String>,
     pub scanlation_group: Option<String>,
     /// Chapters MangaDex hosts only as a link to an outside site have no
-    /// readable page images through `/at-home` — the frontend shows these
-    /// as "read on source" instead of opening the in-app reader.
+    /// readable page images through `/at-home` — the frontend links out
+    /// to `external_url` instead of opening the in-app reader for these.
     pub external: bool,
+    pub external_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,16 +165,20 @@ pub struct ChapterPages {
 fn client() -> AppResult<reqwest::Client> {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
-        .user_agent("Xuro/0.2.0")
+        .user_agent("Xuro/0.2.1")
         .build()
         .map_err(|error| AppError::Network(error.to_string()))
 }
 
 /// GETs `path` on the MangaDex API with `query` (repeated keys allowed,
-/// e.g. multiple `("contentRating[]", "safe")` pairs), retrying once on a
-/// transient 5xx — mirrors `library.rs`'s `fetch_json_with_retry`, kept as
-/// its own small copy here rather than a shared helper so this module has
-/// no dependency on `library.rs` at all.
+/// e.g. multiple `("contentRating[]", "safe")` pairs). Retries up to twice
+/// more (three attempts total) with exponential backoff on a transient
+/// 5xx or a 429 (MangaDex's public rate limit is 5 req/s per IP, and this
+/// app can burst several requests close together — browsing, a details
+/// fetch, a chapter list, and a background update-check can all land at
+/// once) — a single quick retry wasn't holding up under that, which is
+/// the most likely reason a manga would intermittently fail to load
+/// rather than any particular manga being broken.
 async fn get_json<T: for<'de> Deserialize<'de>>(
     path: &str,
     query: &[(String, String)],
@@ -179,9 +187,10 @@ async fn get_json<T: for<'de> Deserialize<'de>>(
     let url = format!("{API_BASE}{path}");
 
     let mut last_error = None;
-    for attempt in 0..2 {
+    for attempt in 0u32..3 {
         if attempt > 0 {
-            tokio::time::sleep(Duration::from_millis(700)).await;
+            let backoff_ms = 600u64 * 2u64.pow(attempt - 1); // 600ms, then 1200ms
+            tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
         }
         match http.get(&url).query(query).send().await {
             Ok(response) => {
@@ -502,6 +511,7 @@ pub async fn chapters(
                 publish_at: chapter.attributes.publish_at,
                 scanlation_group: group,
                 external: chapter.attributes.external_url.is_some(),
+                external_url: chapter.attributes.external_url,
             }
         })
         .collect())
@@ -626,6 +636,7 @@ mod tests {
             publish_at: None,
             scanlation_group: None,
             external: false,
+            external_url: None,
         };
         assert_eq!(chapter_label(&chapter), "Ch. 12 — A New Start");
     }
@@ -641,6 +652,7 @@ mod tests {
             publish_at: None,
             scanlation_group: None,
             external: false,
+            external_url: None,
         };
         assert_eq!(chapter_label(&chapter), "Oneshot");
     }
@@ -648,5 +660,11 @@ mod tests {
     #[test]
     fn language_codes_cover_spanish_variants() {
         assert_eq!(MangaLanguage::Spanish.codes(), &["es", "es-la"]);
+    }
+
+    #[test]
+    fn german_language_maps_to_de() {
+        assert_eq!(MangaLanguage::German.codes(), &["de"]);
+        assert_eq!(MangaLanguage::German.label(), "German");
     }
 }

@@ -633,8 +633,8 @@ pub fn library_list(state: State<'_, AppState>) -> AppResult<Vec<LibraryItem>> {
 }
 
 #[tauri::command]
-pub async fn library_search_books(query: String) -> AppResult<Vec<LibrarySearchResult>> {
-    library::search_books(&query).await
+pub async fn library_search_books(query: String, kind: library::LibraryKind) -> AppResult<Vec<LibrarySearchResult>> {
+    library::search_books(&query, kind).await
 }
 
 #[tauri::command]

@@ -2,6 +2,23 @@
 
 All notable changes to Xuro are documented here. See also the [in-app changelog page](https://usexuro.app/changelog).
 
+## [0.2.1] — September 16, 2026
+
+A bigger built-in element library for Panel mode, and real fixes for Online Manga reliability
+
+### Added
+
+- **Panel mode's built-in Excalidraw Library, expanded to 15 items**: speech bubbles (round, manga-style, and a heavy-stroke shout bubble), a thought bubble, a caption/narration box, two impact/sound-effect bursts, speed lines, focus rings, a panel divider, and five onomatopoeia stickers (BOOM!, POW!, CRASH!, WHAM!, ...!?) — all available from Excalidraw's own Library panel on every page.
+- **German** added to Online Manga's language filter, alongside English, Spanish, Arabic, and Japanese.
+- **Novels** is now its own section in Library, next to Books and Manga — shares Books' Open Library catalog (no separate catalog to maintain), just kept as its own organized shelf. (Manhwa wasn't added as a separate section, since it's already searchable and readable through the Manga tab's existing MangaDex catalog.)
+
+### Fixed
+
+- **A manga's details panel could get stuck on an infinite loading spinner** with no error message and no way to retry if the fetch failed — this is very likely what "some manga just won't load" actually looked like from the outside. It now shows a clear error and a Retry button instead.
+- **MangaDex requests now retry more resilently** — up from one quick retry to two, with backoff, since this app can burst several requests close together (browsing, opening details, loading a chapter list, and a background update-check can all land around the same time) and MangaDex's public rate limit is 5 requests/second per IP. Applied to Open Library/Jikan requests too, for the same reason.
+- **Some manga were missing chapters** — Online Manga only ever fetched the first 100 chapters of a language for a given manga; anything past that was silently cut off. It now fetches every page until there's nothing left.
+- **Chapters marked "External"** now link out to wherever MangaDex points them, instead of being a dead end — these are chapters MangaDex indexes but doesn't host the actual pages for, so there was never going to be an in-app reader for them, but they can least be one click away now.
+
 ## [0.2.0] — September 13, 2026
 
 Snippets removed; Inkwell's Panel mode now matches Xuro's own look

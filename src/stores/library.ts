@@ -85,9 +85,9 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     try {
       const kind = get().searchKind;
       const results =
-        kind === "book"
-          ? await ipc.librarySearchBooks(trimmed)
-          : await ipc.librarySearchManga(trimmed);
+        kind === "manga"
+          ? await ipc.librarySearchManga(trimmed)
+          : await ipc.librarySearchBooks(trimmed, kind);
       // A slower, now-stale search shouldn't clobber a faster, newer one —
       // only apply results if the query is still what's in the box.
       if (get().searchQuery === query) {

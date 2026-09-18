@@ -57,6 +57,7 @@ interface OnlineMangaState {
   activeMangaId: string | null;
   activeMangaDetails: MangaDetails | null;
   activeMangaLoading: boolean;
+  activeMangaError: string | null;
   chapters: MangaChapter[];
   chaptersLoading: boolean;
   chapterLanguage: MangaLanguage | undefined;
@@ -124,6 +125,7 @@ export const useOnlineManga = create<OnlineMangaState>((set, get) => ({
   activeMangaId: null,
   activeMangaDetails: null,
   activeMangaLoading: false,
+  activeMangaError: null,
   chapters: [],
   chaptersLoading: false,
   chapterLanguage: undefined,
@@ -198,6 +200,7 @@ export const useOnlineManga = create<OnlineMangaState>((set, get) => ({
       activeMangaId: id,
       activeMangaDetails: null,
       activeMangaLoading: true,
+      activeMangaError: null,
       chapters: [],
       chapterLanguage: get().filters.language,
     });
@@ -210,19 +213,41 @@ export const useOnlineManga = create<OnlineMangaState>((set, get) => ({
         set({ follows: get().follows.map((f) => (f.mangaId === id ? { ...f, hasUpdate: false } : f)) });
       });
     } catch (err) {
+      // Surfaced two ways on purpose: a toast for the "just happened"
+      // moment, and a persistent error state so the panel doesn't get
+      // stuck on an infinite spinner if the toast is missed or fades —
+      // that dead-end spinner was the actual "this manga won't load"
+      // experience being reported, not a silent failure.
       oops(err);
-      set({ activeMangaLoading: false });
+      set({
+        activeMangaLoading: false,
+        activeMangaError: err instanceof Error ? err.message : String(err),
+      });
     }
   },
 
-  closeManga: () => set({ activeMangaId: null, activeMangaDetails: null, chapters: [] }),
+  closeManga: () =>
+    set({ activeMangaId: null, activeMangaDetails: null, activeMangaError: null, chapters: [] }),
 
   loadChapters: async (language) => {
     const mangaId = get().activeMangaId;
     if (!mangaId) return;
     set({ chaptersLoading: true, chapterLanguage: language });
     try {
-      const chapters = await ipc.mangaOnlineChapters(mangaId, language, 0);
+      // The backend paginates at 100 chapters/page (MangaDex's own feed
+      // limit) — only ever fetching page 0 silently truncated any manga
+      // with more than 100 chapters in a given language. Keep fetching
+      // while a page comes back full, since a full page means there's
+      // likely more.
+      const chapters: MangaChapter[] = [];
+      let page = 0;
+      for (;;) {
+        const batch = await ipc.mangaOnlineChapters(mangaId, language, page);
+        chapters.push(...batch);
+        if (batch.length < 100) break;
+        page += 1;
+        if (page > 20) break; // sane upper bound (~2000 chapters)
+      }
       set({ chapters });
     } catch (err) {
       oops(err);

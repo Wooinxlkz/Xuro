@@ -25,6 +25,19 @@ import { OnlineMangaHub, DownloadsSection } from "./online/OnlineMangaHub";
 
 type LibrarySubTab = "mine" | "online";
 
+/** Books and Novels share the exact same Open Library catalog and search
+ * flow (`BookOnlineTab`) — Novel is its own tab purely for keeping a
+ * local shelf organized, not a separate backend. Manga is the only kind
+ * with its own richer Online experience (`OnlineMangaHub`, MangaDex). */
+const KIND_META: Record<
+  LibraryKind,
+  { tabLabel: string; singular: string; noun: string; onlineLabel: string }
+> = {
+  book: { tabLabel: "Books", singular: "Book", noun: "books", onlineLabel: "Online" },
+  novel: { tabLabel: "Novels", singular: "Novel", noun: "novels", onlineLabel: "Online" },
+  manga: { tabLabel: "Manga", singular: "Manga", noun: "manga", onlineLabel: "Online Manga" },
+};
+
 const VIEW_MODES: Array<{ mode: LibraryViewMode; icon: typeof List; label: string }> = [
   { mode: "list", icon: List, label: "List" },
   { mode: "grid", icon: LayoutGrid, label: "Grid" },
@@ -118,7 +131,7 @@ export function LibraryPage() {
 
         <div className="mb-3 flex items-center gap-2">
           <div className="flex items-center gap-1 rounded-lg border border-line-soft bg-panel p-0.5">
-            {(["book", "manga"] as LibraryKind[]).map((kind) => (
+            {(["book", "novel", "manga"] as LibraryKind[]).map((kind) => (
               <button
                 key={kind}
                 type="button"
@@ -128,7 +141,7 @@ export function LibraryPage() {
                   searchKind === kind ? "bg-active text-ink font-medium" : "text-faint hover:text-ink",
                 )}
               >
-                {kind === "book" ? "Books" : "Manga"}
+                {KIND_META[kind].tabLabel}
               </button>
             ))}
           </div>
@@ -140,7 +153,7 @@ export function LibraryPage() {
             />
             <Input
               value={query}
-              placeholder={`Search your ${searchKind === "book" ? "books" : "manga"}…`}
+              placeholder={`Search your ${KIND_META[searchKind].noun}…`}
               className="pl-8"
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -159,7 +172,7 @@ export function LibraryPage() {
         <div className="mb-3 flex items-center gap-1 rounded-lg border border-line-soft bg-panel p-0.5">
           {([
             { key: "mine", label: "My Library" },
-            { key: "online", label: searchKind === "book" ? "Online" : "Online Manga" },
+            { key: "online", label: KIND_META[searchKind].onlineLabel },
           ] as const).map(({ key, label }) => (
             <button
               key={key}
@@ -211,7 +224,7 @@ export function LibraryPage() {
                   <BookOpen size={22} strokeWidth={1.5} className="text-faint" />
                   <p className="text-[13px] text-muted">Your library is empty</p>
                   <p className="max-w-[280px] text-[11.5px] text-faint">
-                    Upload a file of your own, or check "{searchKind === "book" ? "Online" : "Online Manga"}" above to add something from the catalog.
+                    Upload a file of your own, or check "{KIND_META[searchKind].onlineLabel}" above to add something from the catalog.
                   </p>
                 </div>
               ) : libraryMatches.length === 0 ? (
@@ -407,7 +420,7 @@ function ListView({
           <div className="min-w-0 flex-1">
             <p className="truncate text-[12.5px] font-medium text-ink">{item.title}</p>
             <p className="truncate text-[11px] text-faint">
-              {item.author ?? (item.kind === "book" ? "Book" : "Manga")}
+              {item.author ?? KIND_META[item.kind].singular}
             </p>
           </div>
           <RowActions item={item} onOpen={onOpen} onRemove={onRemove} onAttach={onAttach} />
@@ -566,7 +579,7 @@ function UploadDialog({ defaultKind }: { defaultKind: LibraryKind }) {
             onChange={(e) => setAuthor(e.target.value)}
           />
           <div className="flex items-center gap-1 rounded-lg border border-line-soft bg-panel p-0.5">
-            {(["book", "manga"] as LibraryKind[]).map((k) => (
+            {(["book", "novel", "manga"] as LibraryKind[]).map((k) => (
               <button
                 key={k}
                 type="button"
@@ -576,7 +589,7 @@ function UploadDialog({ defaultKind }: { defaultKind: LibraryKind }) {
                   kind === k ? "bg-active text-ink font-medium" : "text-faint hover:text-ink",
                 )}
               >
-                {k === "book" ? "Book" : "Manga"}
+                {KIND_META[k].singular}
               </button>
             ))}
           </div>

@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   BookOpen,
   Check,
   ChevronDown,
@@ -7,6 +8,7 @@ import {
   Heart,
   Loader2,
   Play,
+  RefreshCw,
   Trash2,
   WifiOff,
   X,
@@ -25,6 +27,9 @@ import { MangaReader } from "./MangaReader";
 export function MangaDetailsPanel({ onClose }: { onClose: () => void }) {
   const details = useOnlineManga((s) => s.activeMangaDetails);
   const loading = useOnlineManga((s) => s.activeMangaLoading);
+  const error = useOnlineManga((s) => s.activeMangaError);
+  const activeMangaId = useOnlineManga((s) => s.activeMangaId);
+  const openManga = useOnlineManga((s) => s.openManga);
   const chapters = useOnlineManga((s) => s.chapters);
   const chaptersLoading = useOnlineManga((s) => s.chaptersLoading);
   const chapterLanguage = useOnlineManga((s) => s.chapterLanguage);
@@ -41,10 +46,37 @@ export function MangaDetailsPanel({ onClose }: { onClose: () => void }) {
   const [readingChapterId, setReadingChapterId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  if (loading || !details) {
+  if (loading) {
     return (
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-bg">
         <Loader2 size={18} className="animate-spin text-faint" />
+      </div>
+    );
+  }
+
+  // A failed load used to leave this panel stuck on the spinner above
+  // forever — the toast error fades, but there was nothing to look at or
+  // do afterward. This is very likely what "some manga just won't load"
+  // actually looked like.
+  if (error || !details) {
+    return (
+      <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-bg px-6 text-center">
+        <AlertTriangle size={22} strokeWidth={1.5} className="text-faint" />
+        <p className="text-[13px] text-muted">Couldn't load this manga</p>
+        {error && <p className="max-w-[320px] text-[11.5px] text-faint">{error}</p>}
+        <div className="mt-1 flex gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Close
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => activeMangaId && void openManga(activeMangaId)}
+          >
+            <RefreshCw size={12} strokeWidth={2} />
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -199,7 +231,18 @@ export function MangaDetailsPanel({ onClose }: { onClose: () => void }) {
                     </span>
                   )}
                   {chapter.external ? (
-                    <span className="text-[10.5px] text-faint">External</span>
+                    chapter.externalUrl ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void openUrl(chapter.externalUrl!)}
+                      >
+                        <ExternalLink size={12} strokeWidth={2} />
+                        Read on source
+                      </Button>
+                    ) : (
+                      <span className="text-[10.5px] text-faint">External</span>
+                    )
                   ) : (
                     <>
                       <Button size="sm" variant="secondary" onClick={() => setReadingChapterId(chapter.id)}>
@@ -265,6 +308,7 @@ function LanguagePicker({
     spanish: ["es", "es-la"],
     arabic: ["ar"],
     japanese: ["ja"],
+    german: ["de"],
   };
   const options = MANGA_LANGUAGES.filter((l) => codeMap[l.value].some((c) => available.includes(c)));
 
